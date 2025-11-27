@@ -4,6 +4,12 @@ import { useFinancialSummary, FinancialPeriod } from "@/hooks/use-financial-summ
 import { BusinessRevenueCard } from "./business-revenue-card";
 import { OperatingAccountCard } from "./operating-account-card";
 import { WithdrawableProfitCard } from "./withdrawable-profit-card";
+import { BankBalanceCard } from "./bank-balance-card";
+import { LockedAdvanceCard } from "./locked-advance-card";
+import { TripReservesCard } from "./trip-reserves-card";
+import { BusinessAccountCard } from "./business-account-card";
+import { ProfitCard } from "./profit-card";
+import { TripBalancesCard } from "./trip-balances-card";
 import { Loading } from "@/components/ui/loading";
 import { ErrorDisplay } from "@/components/ui/error";
 
@@ -18,6 +24,9 @@ export function FinancialSummary({ onWithdraw, period = "all" }: FinancialSummar
   if (isLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Loading />
+        <Loading />
+        <Loading />
         <Loading />
         <Loading />
         <Loading />
@@ -39,24 +48,59 @@ export function FinancialSummary({ onWithdraw, period = "all" }: FinancialSummar
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <BusinessRevenueCard
-        revenue={summary.businessRevenue}
-        profitPool={summary.profitPool}
-        operatingPool={summary.operatingPool}
-      />
-      <OperatingAccountCard
-        balance={summary.operatingAccount}
-        operatingPool={summary.operatingPool}
-        totalExpenses={summary.totalExpenses}
-        status={summary.operatingStatus}
-      />
-      <WithdrawableProfitCard
-        amount={summary.withdrawableProfit}
-        profitPool={summary.profitPool}
-        totalWithdrawals={summary.totalWithdrawals}
-        onWithdraw={onWithdraw}
-      />
+    <div className="space-y-6">
+      {/* Primary Financial Cards - Five-Bucket Model + Trip Money Flow */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Bank Balance - Total cash */}
+        <BankBalanceCard
+          bankBalance={summary.bankBalance}
+          totalAdvanceReceived={summary.totalAdvanceReceived}
+          earnedRevenue={summary.earnedRevenue}
+        />
+
+        {/* Total Profit - From completed trips */}
+        <ProfitCard
+          profit={summary.profitPool}
+          withdrawableProfit={summary.withdrawableProfit}
+          totalWithdrawals={summary.totalWithdrawals}
+        />
+
+        {/* Business Balance - Global business budget */}
+        <BusinessAccountCard
+          balance={summary.businessBalance || summary.businessAccount || 0}
+          businessExpenses={summary.businessExpenses}
+        />
+
+        {/* Trip Balances - Active trip budgets */}
+        <TripBalancesCard
+          balance={summary.tripBalances || 0}
+          tripCount={summary.activeTripsCount || 0}
+          tripExpenses={summary.tripExpenses || 0}
+        />
+
+        {/* Upcoming Locked Reserve - Will convert to profit */}
+        <TripReservesCard
+          amount={summary.upcomingLockedReserve || summary.tripReserve || summary.totalTripReserves}
+        />
+      </div>
+
+      {/* Legacy/Reference Cards (can be removed later) */}
+      {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <BusinessRevenueCard
+          earnedRevenue={summary.earnedRevenue}
+          totalAdvanceReceived={summary.totalAdvanceReceived}
+          profitPool={summary.profitPool}
+        />
+        <WithdrawableProfitCard
+          amount={summary.withdrawableProfit}
+          profitPool={summary.profitPool}
+          totalWithdrawals={summary.totalWithdrawals}
+          onWithdraw={onWithdraw}
+        />
+        <LockedAdvanceCard
+          amount={summary.totalLockedAdvance}
+        />
+      </div> */}
     </div>
   );
 }

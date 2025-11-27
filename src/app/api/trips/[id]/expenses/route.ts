@@ -58,10 +58,10 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Verify trip belongs to user
+  // Verify trip belongs to user and get trip reserve balance
   const { data: trip } = await supabase
     .from("trips")
-    .select("id")
+    .select("id, name, trip_reserve_balance")
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -71,6 +71,34 @@ export async function POST(
   }
 
   const body = await request.json();
+
+  // Check if adding this expense would exceed trip reserve balance
+  // Get current trip expenses
+  const { data: currentExpenses } = await supabase
+    .from("expenses")
+    .select("amount")
+    .eq("trip_id", id);
+
+  const currentTripExpenses = currentExpenses?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0;
+  const expenseAmount = Number(body.amount);
+  const tripReserveBalance = Number((trip as any).trip_reserve_balance) || 0;
+  const remainingReserve = tripReserveBalance - currentTripExpenses;
+  const shortfall = expenseAmount - remainingReserve;
+
+  if (shortfall > 0 && !body.ignoreWarning) {
+    // Return warning - expense would exceed available trip reserve
+    return NextResponse.json(
+      {
+        warning: true,
+        message: "Expense exceeds available trip reserve",
+        tripName: (trip as any).name,
+        tripReserveBalance,
+        expenseAmount,
+        shortfall,
+      },
+      { status: 400 }
+    );
+  }
 
   const { data, error } = await supabase
     .from("expenses")

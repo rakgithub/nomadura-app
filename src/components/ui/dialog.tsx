@@ -92,3 +92,29 @@ export function DialogFooter({ children, className }: DialogFooterProps) {
     </div>
   );
 }
+
+interface DialogTitleProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function DialogTitle({ children, className }: DialogTitleProps) {
+  return (
+    <h2 className={cn("text-lg font-semibold", className)}>
+      {children}
+    </h2>
+  );
+}
+
+interface DialogDescriptionProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export function DialogDescription({ children, className }: DialogDescriptionProps) {
+  return (
+    <p className={cn("text-sm text-muted-foreground mt-2", className)}>
+      {children}
+    </p>
+  );
+}

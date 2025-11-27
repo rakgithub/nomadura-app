@@ -1,22 +1,40 @@
 /**
  * Financial Summary Types
  *
- * Types for fund separation calculations using the 30/70 split model:
- * - 30% of revenue goes to profit pool (withdrawable by owner)
- * - 70% of revenue goes to operating pool (covers all expenses)
+ * NEW Expense-Aware Financial Model (per updated PRD):
+ * - Locked Advance = Sum of advances for trips NOT completed (status-based)
+ * - Reserve Requirement = Sum of estimated_cost for all upcoming trips
+ * - Operating Account = Bank Balance - Reserve Requirement
+ * - Revenue is only earned when trips are completed
+ * - 30/70 split applies ONLY when trip completes
  */
 
 export type OperatingStatus = 'healthy' | 'warning' | 'critical';
 
 export interface FinancialSummary {
-  /** Total income from all participant payments */
-  businessRevenue: number;
+  /** Actual money in the bank account */
+  bankBalance: number;
 
-  /** 30% of revenue allocated as owner profit */
-  profitPool: number;
+  /** Revenue earned from completed trips only (not advance) */
+  earnedRevenue: number;
 
-  /** 70% of revenue allocated for operations */
-  operatingPool: number;
+  /** Total customer advances received for upcoming trips */
+  totalAdvanceReceived: number;
+
+  /** Locked advance (sum of advances for trips NOT completed - status-based) */
+  totalLockedAdvance: number;
+
+  /** Total reserve requirement (sum of estimated costs for upcoming trips) */
+  reserveRequirement: number;
+
+  /** Money available for operations (Bank Balance - Reserve Requirement) */
+  operatingAccount: number;
+
+  /** Health status of operating account */
+  operatingStatus: OperatingStatus;
+
+  /** Reserve shortfall (if reserve requirement exceeds bank balance) */
+  reserveShortfall: number;
 
   /** Total trip-specific expenses (transport, accommodation, etc.) */
   tripExpenses: number;
@@ -27,15 +45,48 @@ export interface FinancialSummary {
   /** Sum of trip and business expenses */
   totalExpenses: number;
 
-  /** Operating pool minus total expenses (can be negative if over budget) */
-  operatingAccount: number;
-
-  /** Health status of operating account */
-  operatingStatus: OperatingStatus;
+  /** 30% profit pool from earned revenue (only from completed trips) */
+  profitPool: number;
 
   /** Total amount withdrawn to date */
   totalWithdrawals: number;
 
-  /** Amount available to withdraw now (profit pool - withdrawals) */
+  /** Total amount transferred from profit to operating pool */
+  totalTransfers: number;
+
+  /** Amount available to withdraw now (profit pool - withdrawals - transfers) */
   withdrawableProfit: number;
+
+  /** Total profit from completed trips (sum of released_profit) */
+  totalProfit?: number;
+
+  /** Total profit (same as totalProfit, main field) */
+  profit?: number;
+
+  /** Business account balance */
+  businessBalance?: number;
+
+  /** Business account (same as businessBalance) */
+  businessAccount?: number;
+
+  /** Sum of operating_account for active trips */
+  tripBalances?: number;
+
+  /** Sum of trip_reserve_balance for active trips */
+  upcomingLockedReserve?: number;
+
+  /** Count of active trips */
+  activeTripsCount?: number;
+
+  /** Trip reserve total */
+  tripReserve?: number;
+
+  /** @deprecated Use reserveRequirement instead */
+  totalTripReserves: number;
+
+  /** @deprecated Concept removed in new PRD */
+  totalEarlyUnlock: number;
+
+  /** NEW: Unlocked operating amount from advances (100 - reserve%) */
+  unlockedOperating?: number;
 }

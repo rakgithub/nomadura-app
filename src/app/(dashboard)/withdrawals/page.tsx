@@ -65,7 +65,7 @@ export default function WithdrawalsPage() {
   if (error) {
     return (
       <div className="min-h-screen p-8">
-        <ErrorDisplay message="Failed to load withdrawals" onRetry={refetch} />
+        <ErrorDisplay message="Failed to load withdrawals" retry={refetch} />
       </div>
     );
   }
@@ -139,7 +139,7 @@ export default function WithdrawalsPage() {
           <CardContent>
             {!withdrawals || withdrawals.length === 0 ? (
               <EmptyState
-                message="No withdrawals yet"
+                title="No withdrawals yet"
                 description="Click 'New Withdrawal' to record your first profit withdrawal"
               />
             ) : (
@@ -214,7 +214,7 @@ export default function WithdrawalsPage() {
         onConfirm={handleDelete}
         title="Delete Withdrawal"
         description="Are you sure you want to delete this withdrawal? This action cannot be undone."
-        isPending={deleteWithdrawal.isPending}
+        isLoading={deleteWithdrawal.isPending}
       />
     </div>
   );

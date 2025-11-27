@@ -63,7 +63,7 @@ export function BusinessExpenseList() {
     return (
       <ErrorDisplay
         message="Failed to load business expenses"
-        onRetry={refetch}
+        retry={refetch}
       />
     );
   }
@@ -85,7 +85,7 @@ export function BusinessExpenseList() {
         <CardContent>
           {!expenses || expenses.length === 0 ? (
             <EmptyState
-              message="No business expenses yet"
+              title="No business expenses yet"
               description="Click 'New Business Expense' to add your first expense"
             />
           ) : (
@@ -163,7 +163,7 @@ export function BusinessExpenseList() {
         onConfirm={handleDelete}
         title="Delete Business Expense"
         description="Are you sure you want to delete this business expense? This action cannot be undone."
-        isPending={deleteExpense.isPending}
+        isLoading={deleteExpense.isPending}
       />
     </>
   );

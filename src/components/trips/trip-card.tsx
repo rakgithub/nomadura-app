@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Calendar, MapPin, Users, IndianRupee, ChevronRight } from "lucide-react";
 
 const statusColors: Record<TripStatus, string> = {
-  upcoming: "bg-blue-100 text-blue-700",
+  upcoming: "text-emerald-700",
   in_progress: "bg-violet-100 text-violet-700",
   completed: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-red-100 text-red-700",
@@ -20,12 +20,8 @@ const statusLabels: Record<TripStatus, string> = {
   cancelled: "Cancelled",
 };
 
-const statusBorderColors: Record<TripStatus, string> = {
-  upcoming: "border-l-blue-500",
-  in_progress: "border-l-violet-500",
-  completed: "border-l-emerald-500",
-  cancelled: "border-l-red-500",
-};
+// Upcoming uses lime green, others keep their colors
+const upcomingBgStyle = { backgroundColor: "#9CBB0420" };
 
 interface TripCardProps {
   trip: Trip;
@@ -33,7 +29,7 @@ interface TripCardProps {
 
 export function TripCard({ trip }: TripCardProps) {
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
+    return new Date(date).toLocaleDateString("en-IN", {
       month: "short",
       day: "numeric",
     });
@@ -41,10 +37,7 @@ export function TripCard({ trip }: TripCardProps) {
 
   return (
     <Link href={`/trips/${trip.id}`}>
-      <Card className={cn(
-        "group hover:shadow-lg transition-all cursor-pointer border-l-4",
-        statusBorderColors[trip.status]
-      )}>
+      <Card className="group hover:shadow-lg transition-all cursor-pointer">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -53,8 +46,11 @@ export function TripCard({ trip }: TripCardProps) {
               </h3>
               {trip.destination && (
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-2">
-                  <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                  <div
+                    className="h-6 w-6 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: "#9CBB0420" }}
+                  >
+                    <MapPin className="h-3.5 w-3.5" style={{ color: "#9CBB04" }} />
                   </div>
                   <span className="truncate">{trip.destination}</span>
                 </div>
@@ -65,6 +61,7 @@ export function TripCard({ trip }: TripCardProps) {
                 "px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0",
                 statusColors[trip.status]
               )}
+              style={trip.status === "upcoming" ? upcomingBgStyle : undefined}
             >
               {statusLabels[trip.status]}
             </span>

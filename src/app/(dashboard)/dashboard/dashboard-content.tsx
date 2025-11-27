@@ -31,10 +31,10 @@ export function DashboardContent({ userEmail }: DashboardContentProps) {
         </div>
 
         {/* Trip Stats */}
-        <div>
+        {/* <div>
           <h2 className="text-lg font-semibold mb-3">Trips Overview</h2>
           <TripStats />
-        </div>
+        </div> */}
 
         {/* Financial Overview */}
         <div>

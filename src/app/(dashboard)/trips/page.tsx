@@ -13,6 +13,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { paginateArray, getTotalPages } from "@/lib/pagination";
 import { Plus } from "lucide-react";
 import { TripStatus } from "@/types/database";
+import { TripStats } from "@/components/dashboard/trip-stats";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -50,6 +51,7 @@ export default function TripsPage() {
     start_date: string;
     end_date: string;
     status?: TripStatus;
+    reserve_percentage?: number;
     min_participants?: number;
     price_per_participant?: number;
     notes?: string;
@@ -86,6 +88,11 @@ export default function TripsPage() {
           New Trip
         </Button>
       </div>
+
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Trips Overview</h2>
+          <TripStats />
+        </div>
 
       {/* Filters */}
       <div className="flex gap-2 flex-wrap items-center">

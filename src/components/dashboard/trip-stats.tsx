@@ -50,8 +50,8 @@ export function TripStats() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+          <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ backgroundColor: "#9CBB0420" }}>
+            <TrendingUp className="h-5 w-5" style={{ color: "#9CBB04" }} />
           </div>
         </CardHeader>
         <CardContent>

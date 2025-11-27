@@ -2,11 +2,13 @@ import { cn } from "@/lib/utils";
 import { TripStatus } from "@/types/database";
 
 const statusColors: Record<TripStatus, string> = {
-  upcoming: "bg-blue-100 text-blue-700",
+  upcoming: "text-[#9CBB04]",
   in_progress: "bg-violet-100 text-violet-700",
   completed: "bg-emerald-100 text-emerald-700",
   cancelled: "bg-red-100 text-red-700",
 };
+
+const upcomingBgStyle = { backgroundColor: "#9CBB0420" };
 
 const statusLabels: Record<TripStatus, string> = {
   upcoming: "Upcoming",
@@ -28,6 +30,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         statusColors[status],
         className
       )}
+      style={status === "upcoming" ? upcomingBgStyle : undefined}
     >
       {statusLabels[status]}
     </span>

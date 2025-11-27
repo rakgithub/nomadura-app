@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { InsertBusinessExpense } from "@/types/database";
+import { calculateAdvanceBasedFinancials } from "@/lib/calculations/fund-separation";
 
 /**
  * GET /api/business-expenses
@@ -79,6 +80,120 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // NEW: Check Operating Account balance using reserve requirement logic
+    // Fetch current financial data
+    const [tripsResult, businessExpensesResult, withdrawalsResult, transfersResult] = await Promise.all([
+      supabase
+        .from("trips")
+        .select("id, status, total_advance_received, estimated_cost, earned_revenue")
+        .eq("user_id", user.id),
+      supabase
+        .from("business_expenses")
+        .select("amount")
+        .eq("user_id", user.id),
+      supabase
+        .from("withdrawals")
+        .select("amount")
+        .eq("user_id", user.id),
+      supabase
+        .from("transfers")
+        .select("amount")
+        .eq("user_id", user.id),
+    ]);
+
+    if (tripsResult.error || businessExpensesResult.error || withdrawalsResult.error || transfersResult.error) {
+      return NextResponse.json(
+        { error: "Failed to fetch financial data" },
+        { status: 500 }
+      );
+    }
+
+    const trips = tripsResult.data || [];
+    const businessExpenses = businessExpensesResult.data || [];
+    const withdrawals = withdrawalsResult.data || [];
+    const transfers = transfersResult.data || [];
+
+    // Calculate totals using NEW status-based logic
+    const totalAdvanceReceived = trips.reduce((sum, t: any) => sum + (Number(t.total_advance_received) || 0), 0);
+
+    // Locked advance: sum of advances for trips NOT completed (status-based)
+    const totalLockedAdvance = trips.reduce((sum, t: any) => {
+      if (t.status !== 'completed' && t.status !== 'cancelled') {
+        return sum + (Number(t.total_advance_received) || 0);
+      }
+      return sum;
+    }, 0);
+
+    // Reserve requirement: sum of estimated costs for upcoming trips
+    const reserveRequirement = trips.reduce((sum, t: any) => {
+      if (t.status !== 'completed' && t.status !== 'cancelled') {
+        return sum + (Number(t.estimated_cost) || 0);
+      }
+      return sum;
+    }, 0);
+
+    const earnedRevenue = trips.reduce((sum, t: any) => {
+      if (t.status === 'completed') {
+        return sum + (Number(t.earned_revenue) || 0);
+      }
+      return sum;
+    }, 0);
+
+    const currentBusinessExpenses = businessExpenses.reduce((sum, e: any) => sum + Number(e.amount), 0);
+    const totalWithdrawals = withdrawals.reduce((sum, w: any) => sum + Number(w.amount), 0);
+    const totalTransfers = transfers.reduce((sum, t: any) => sum + Number(t.amount), 0);
+
+    // Get trip expenses
+    const tripIds = trips.map((t: any) => t.id);
+    let tripExpenses = 0;
+    if (tripIds.length > 0) {
+      const tripExpensesResult = await supabase
+        .from("expenses")
+        .select("amount")
+        .in("trip_id", tripIds);
+
+      tripExpenses = tripExpensesResult.data?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0;
+    }
+
+    // Calculate bank balance
+    const bankBalance = totalAdvanceReceived + earnedRevenue - tripExpenses - currentBusinessExpenses - totalWithdrawals;
+
+    // Calculate current financial state using NEW logic
+    const financialSummary = calculateAdvanceBasedFinancials(
+      bankBalance,
+      earnedRevenue,
+      totalAdvanceReceived,
+      totalLockedAdvance,
+      reserveRequirement,  // NEW: dynamic reserve requirement
+      tripExpenses,
+      currentBusinessExpenses,
+      totalWithdrawals,
+      totalTransfers
+    );
+
+    // Check if expense would cause reserve shortfall
+    const expenseAmount = Number(body.amount);
+    const availableOperatingCash = financialSummary.operatingAccount;
+    const newBankBalance = bankBalance - expenseAmount;
+    const newReserveShortfall = Math.max(0, reserveRequirement - newBankBalance);
+
+    if (newReserveShortfall > 0 && !body.ignoreWarning) {
+      // Return warning - this expense would cause reserve shortfall
+      return NextResponse.json(
+        {
+          warning: true,
+          message: "This expense will cause reserve shortfall",
+          availableOperatingCash,
+          expenseAmount,
+          reserveRequirement,
+          currentBankBalance: bankBalance,
+          newBankBalance,
+          reserveShortfall: newReserveShortfall,
+        },
+        { status: 400 }
+      );
+    }
+
     const insertData: InsertBusinessExpense = {
       user_id: user.id,
       category: body.category,
@@ -90,7 +205,7 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await supabase
       .from("business_expenses")
-      .insert(insertData)
+      .insert(insertData as never)
       .select()
       .single();
 

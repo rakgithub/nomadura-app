@@ -75,7 +75,7 @@ export async function PUT(
 
     const { data, error } = await supabase
       .from("destinations")
-      .update(updateData)
+      .update(updateData as never)
       .eq("id", id)
       .eq("user_id", user.id)
       .select()

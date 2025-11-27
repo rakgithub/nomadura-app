@@ -25,10 +25,11 @@ export type ExpenseCategory =
 
 export type BusinessExpenseCategory =
   | "rent"
-  | "software"
+  | "software_tools"
+  | "fb_ads"
   | "marketing"
-  | "insurance"
-  | "other";
+  | "utility_bills"
+  | "travel";
 
 export interface Database {
   public: {
@@ -170,7 +171,18 @@ export interface Database {
           status: TripStatus;
           min_participants: number | null;
           price_per_participant: number | null;
+          estimated_cost: number;
+          reserve_percentage: number;
           notes: string | null;
+          total_advance_received: number;
+          trip_reserve_balance: number;
+          operating_account: number;
+          business_account: number;
+          released_profit: number;
+          // Old fields kept for backward compatibility
+          early_unlock_total: number;
+          locked_advance_total: number;
+          earned_revenue: number;
           created_at: string;
           updated_at: string;
         };
@@ -185,7 +197,18 @@ export interface Database {
           status?: TripStatus;
           min_participants?: number | null;
           price_per_participant?: number | null;
+          estimated_cost?: number;
+          reserve_percentage?: number;
           notes?: string | null;
+          total_advance_received?: number;
+          trip_reserve_balance?: number;
+          operating_account?: number;
+          business_account?: number;
+          released_profit?: number;
+          // Old fields kept for backward compatibility
+          early_unlock_total?: number;
+          locked_advance_total?: number;
+          earned_revenue?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -200,7 +223,17 @@ export interface Database {
           status?: TripStatus;
           min_participants?: number | null;
           price_per_participant?: number | null;
+          estimated_cost?: number;
+          reserve_percentage?: number;
           notes?: string | null;
+          total_advance_received?: number;
+          trip_reserve_balance?: number;
+          operating_account?: number;
+          business_account?: number;
+          released_profit?: number;
+          early_unlock_total?: number;
+          locked_advance_total?: number;
+          earned_revenue?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -269,6 +302,158 @@ export interface Database {
           updated_at?: string;
         };
       };
+      transfers: {
+        Row: {
+          id: string;
+          user_id: string;
+          amount: number;
+          transfer_date: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          amount: number;
+          transfer_date?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          amount?: number;
+          transfer_date?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      settings: {
+        Row: {
+          id: string;
+          user_id: string;
+          trip_reserve_percentage: number;
+          early_unlock_percentage: number;
+          locked_percentage: number;
+          minimum_operating_cash_threshold: number;
+          minimum_trip_reserve_threshold: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          trip_reserve_percentage?: number;
+          early_unlock_percentage?: number;
+          locked_percentage?: number;
+          minimum_operating_cash_threshold?: number;
+          minimum_trip_reserve_threshold?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          trip_reserve_percentage?: number;
+          early_unlock_percentage?: number;
+          locked_percentage?: number;
+          minimum_operating_cash_threshold?: number;
+          minimum_trip_reserve_threshold?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      advance_payments: {
+        Row: {
+          id: string;
+          trip_id: string;
+          participant_id: string | null;
+          amount: number;
+          payment_date: string;
+          trip_reserve_amount: number;
+          operating_amount: number;
+          business_amount: number;
+          // Old fields kept for backward compatibility
+          early_unlock_amount: number;
+          locked_amount: number;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          participant_id?: string | null;
+          amount: number;
+          payment_date?: string;
+          trip_reserve_amount?: number;
+          operating_amount?: number;
+          business_amount?: number;
+          // Old fields kept for backward compatibility
+          early_unlock_amount?: number;
+          locked_amount?: number;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          trip_id?: string;
+          participant_id?: string | null;
+          amount?: number;
+          payment_date?: string;
+          trip_reserve_amount?: number;
+          early_unlock_amount?: number;
+          locked_amount?: number;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      trip_completion_logs: {
+        Row: {
+          id: string;
+          trip_id: string;
+          user_id: string;
+          final_profit: number;
+          reserve_released: number;
+          trip_spend_released: number;
+          total_advance_received: number;
+          total_expenses: number;
+          breakdown: Record<string, any> | null;
+          completed_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trip_id: string;
+          user_id: string;
+          final_profit: number;
+          reserve_released: number;
+          trip_spend_released: number;
+          total_advance_received: number;
+          total_expenses: number;
+          breakdown?: Record<string, any> | null;
+          completed_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trip_id?: string;
+          user_id?: string;
+          final_profit?: number;
+          reserve_released?: number;
+          trip_spend_released?: number;
+          total_advance_received?: number;
+          total_expenses?: number;
+          breakdown?: Record<string, any> | null;
+          completed_at?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;
@@ -319,3 +504,19 @@ export type UpdateWithdrawal = UpdateTables<"withdrawals">;
 export type Destination = Tables<"destinations">;
 export type InsertDestination = InsertTables<"destinations">;
 export type UpdateDestination = UpdateTables<"destinations">;
+
+export type Transfer = Tables<"transfers">;
+export type InsertTransfer = InsertTables<"transfers">;
+export type UpdateTransfer = UpdateTables<"transfers">;
+
+export type Settings = Tables<"settings">;
+export type InsertSettings = InsertTables<"settings">;
+export type UpdateSettings = UpdateTables<"settings">;
+
+export type AdvancePayment = Tables<"advance_payments">;
+export type InsertAdvancePayment = InsertTables<"advance_payments">;
+export type UpdateAdvancePayment = UpdateTables<"advance_payments">;
+
+export type TripCompletionLog = Tables<"trip_completion_logs">;
+export type InsertTripCompletionLog = InsertTables<"trip_completion_logs">;
+export type UpdateTripCompletionLog = UpdateTables<"trip_completion_logs">;

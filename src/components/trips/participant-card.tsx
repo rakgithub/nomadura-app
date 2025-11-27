@@ -1,12 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { usePayments, useCreatePayment } from "@/hooks/use-payments";
 import { Participant } from "@/types/database";
-import { Mail, Phone, Pencil, ChevronDown, ChevronUp, Plus, Calendar } from "lucide-react";
+import { Mail, Phone, Pencil, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface ParticipantCardProps {
   participant: Participant;
@@ -14,63 +10,41 @@ interface ParticipantCardProps {
   pricePerParticipant?: number | null;
   formatCurrency: (amount: number) => string;
   onEdit: () => void;
+  isReadOnly?: boolean;
 }
 
 export function ParticipantCard({
   participant,
-  tripId,
   pricePerParticipant,
   formatCurrency,
   onEdit,
+  isReadOnly = false,
 }: ParticipantCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showAddPayment, setShowAddPayment] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [paymentNotes, setPaymentNotes] = useState("");
-
-  const { data: payments = [], isLoading: paymentsLoading } = usePayments(
-    tripId,
-    isExpanded ? participant.id : ""
-  );
-  const createPayment = useCreatePayment();
-
-  const handleAddPayment = async () => {
-    if (!paymentAmount) return;
-    try {
-      await createPayment.mutateAsync({
-        tripId,
-        participantId: participant.id,
-        data: {
-          amount: Number(paymentAmount),
-          payment_date: paymentDate,
-          notes: paymentNotes || undefined,
-        },
-      });
-      setShowAddPayment(false);
-      setPaymentAmount("");
-      setPaymentNotes("");
-      setPaymentDate(new Date().toISOString().split("T")[0]);
-    } catch (error) {
-      console.error("Failed to add payment:", error);
-    }
-  };
-
   const amountDue = pricePerParticipant
     ? pricePerParticipant - participant.amount_paid
     : 0;
 
+  const paymentProgress = pricePerParticipant
+    ? (participant.amount_paid / pricePerParticipant) * 100
+    : 0;
+
+  const isPaidInFull = pricePerParticipant && amountDue <= 0;
+
   return (
-    <div className="border rounded-lg">
-      <div
-        className="flex items-center justify-between p-3 cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div>
-          <div className="font-medium">{participant.name}</div>
-          <div className="flex gap-4 text-sm text-muted-foreground mt-1">
+    <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-semibold text-lg">{participant.name}</h3>
+            {isPaidInFull && (
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+            )}
+            {!isPaidInFull && amountDue > 0 && (
+              <AlertCircle className="h-5 w-5 text-amber-600" />
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
             {participant.email && (
               <span className="flex items-center gap-1">
                 <Mail className="h-3 w-3" />
@@ -84,25 +58,67 @@ export function ParticipantCard({
               </span>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="font-medium">
-              {formatCurrency(participant.amount_paid)}
-              <span className="text-xs text-muted-foreground ml-1">paid</span>
-            </div>
-            {pricePerParticipant && (
-              <div
-                className={`text-sm ${
-                  amountDue > 0 ? "text-destructive" : "text-green-600"
-                }`}
-              >
-                {amountDue > 0
-                  ? `${formatCurrency(amountDue)} due`
-                  : "Paid in full"}
+
+          {/* Payment Info */}
+          {pricePerParticipant ? (
+            <div className="space-y-2">
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Payment Progress</span>
+                  <span>{Math.min(Math.round(paymentProgress), 100)}%</span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      isPaidInFull ? "bg-green-600" : "bg-blue-600"
+                    }`}
+                    style={{ width: `${Math.min(paymentProgress, 100)}%` }}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+
+              {/* Amount Details */}
+              <div className="grid grid-cols-3 gap-2 pt-2">
+                <div className="text-center p-2 bg-muted/50 rounded-md">
+                  <div className="text-xs text-muted-foreground mb-1">Total</div>
+                  <div className="font-semibold text-sm">
+                    {formatCurrency(pricePerParticipant)}
+                  </div>
+                </div>
+                <div className="text-center p-2 bg-green-50 rounded-md">
+                  <div className="text-xs text-green-700 mb-1">Paid</div>
+                  <div className="font-semibold text-sm text-green-600">
+                    {formatCurrency(participant.amount_paid)}
+                  </div>
+                </div>
+                <div className={`text-center p-2 rounded-md ${
+                  isPaidInFull ? "bg-green-50" : "bg-amber-50"
+                }`}>
+                  <div className={`text-xs mb-1 ${
+                    isPaidInFull ? "text-green-700" : "text-amber-700"
+                  }`}>
+                    {isPaidInFull ? "Status" : "Due"}
+                  </div>
+                  <div className={`font-semibold text-sm ${
+                    isPaidInFull ? "text-green-600" : "text-amber-600"
+                  }`}>
+                    {isPaidInFull ? "Complete" : formatCurrency(amountDue)}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-2 bg-muted/50 rounded-md">
+              <div className="text-xs text-muted-foreground mb-1">Total Paid</div>
+              <div className="font-semibold text-green-600">
+                {formatCurrency(participant.amount_paid)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {!isReadOnly && (
           <Button
             variant="ghost"
             size="icon"
@@ -110,122 +126,17 @@ export function ParticipantCard({
               e.stopPropagation();
               onEdit();
             }}
+            className="flex-shrink-0"
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          {isExpanded ? (
-            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          )}
-        </div>
+        )}
       </div>
 
-      {isExpanded && (
-        <div className="border-t p-3 bg-muted/30">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-medium">Payment History</h4>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowAddPayment(!showAddPayment)}
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Record Payment
-            </Button>
-          </div>
-
-          {showAddPayment && (
-            <div className="mb-4 p-3 bg-background border rounded-lg">
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="space-y-1">
-                  <Label htmlFor="amount" className="text-xs">
-                    Amount *
-                  </Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="date" className="text-xs">
-                    Date
-                  </Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={paymentDate}
-                    onChange={(e) => setPaymentDate(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1 mb-3">
-                <Label htmlFor="notes" className="text-xs">
-                  Notes
-                </Label>
-                <Input
-                  id="notes"
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  placeholder="Optional notes"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowAddPayment(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleAddPayment}
-                  disabled={!paymentAmount || createPayment.isPending}
-                >
-                  {createPayment.isPending ? "Adding..." : "Add Payment"}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {paymentsLoading ? (
-            <div className="text-sm text-muted-foreground">
-              Loading payments...
-            </div>
-          ) : payments.length > 0 ? (
-            <div className="space-y-2">
-              {payments.map((payment) => (
-                <div
-                  key={payment.id}
-                  className="flex items-center justify-between text-sm p-2 bg-background rounded"
-                >
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-3 w-3 text-muted-foreground" />
-                    <span>
-                      {new Date(payment.payment_date).toLocaleDateString()}
-                    </span>
-                    {payment.notes && (
-                      <span className="text-muted-foreground">
-                        - {payment.notes}
-                      </span>
-                    )}
-                  </div>
-                  <span className="font-medium text-green-600">
-                    +{formatCurrency(payment.amount)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              No payments recorded yet
-            </div>
-          )}
+      {participant.notes && (
+        <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+          <span className="font-medium">Notes: </span>
+          {participant.notes}
         </div>
       )}
     </div>

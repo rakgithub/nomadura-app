@@ -16,6 +16,7 @@ export interface TripFormData {
   start_date: string;
   end_date: string;
   status?: TripStatus;
+  reserve_percentage?: number;
   min_participants?: number;
   price_per_participant?: number;
   notes?: string;
@@ -45,6 +46,7 @@ export function TripForm({ trip, onSubmit, onCancel, isLoading }: TripFormProps)
     start_date: trip?.start_date || "",
     end_date: trip?.end_date || "",
     status: trip?.status,
+    reserve_percentage: trip?.reserve_percentage || 0.60,
     min_participants: trip?.min_participants || undefined,
     price_per_participant: trip?.price_per_participant || undefined,
     notes: trip?.notes || "",
@@ -56,9 +58,24 @@ export function TripForm({ trip, onSubmit, onCancel, isLoading }: TripFormProps)
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
+    let processedValue: string | number | undefined = value;
+
+    // Convert to number for numeric input types (but NOT for reserve_percentage)
+    if (type === "number" && name !== "reserve_percentage") {
+      processedValue = value ? Number(value) : undefined;
+    }
+
+    // For reserve_percentage, convert to number with proper decimal precision
+    if (name === "reserve_percentage") {
+      console.log('TRIP FORM - reserve_percentage changed:', value);
+      // Parse as float and ensure 2 decimal places for database DECIMAL(3,2) type
+      processedValue = value ? parseFloat(parseFloat(value).toFixed(2)) : 0.60;
+      console.log('TRIP FORM - converted to:', processedValue);
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "number" ? (value ? Number(value) : undefined) : value,
+      [name]: processedValue,
     }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
@@ -76,6 +93,7 @@ export function TripForm({ trip, onSubmit, onCancel, isLoading }: TripFormProps)
       return;
     }
 
+    console.log('TRIP FORM - Submitting formData.reserve_percentage:', formData.reserve_percentage, 'Type:', typeof formData.reserve_percentage);
     onSubmit(formData);
   };
 
@@ -155,6 +173,27 @@ export function TripForm({ trip, onSubmit, onCancel, isLoading }: TripFormProps)
             <p className="text-sm text-destructive">{errors.end_date}</p>
           )}
         </div>
+      </div>
+
+      {/* Trip Reserve Percentage */}
+      <div className="space-y-2">
+        <Label htmlFor="reserve_percentage">Trip Reserve % *</Label>
+        <select
+          id="reserve_percentage"
+          name="reserve_percentage"
+          value={formData.reserve_percentage?.toFixed(2) || "0.60"}
+          onChange={handleChange}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <option value="0.30">30%</option>
+          <option value="0.40">40%</option>
+          <option value="0.50">50%</option>
+          <option value="0.60">60%</option>
+          <option value="0.70">70%</option>
+        </select>
+        <p className="text-xs text-muted-foreground">
+          This percentage determines how much of incoming advances is locked as protected trip funds.
+        </p>
       </div>
 
       {/* Only show status when editing */}

@@ -20,6 +20,7 @@ async function createExpense({
     amount: number;
     expense_date?: string;
     notes?: string;
+    ignoreWarning?: boolean;
   };
 }): Promise<Expense> {
   const res = await fetch(`/api/trips/${tripId}/expenses`, {
@@ -27,7 +28,14 @@ async function createExpense({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to add expense");
+
+  if (!res.ok) {
+    const error = await res.json();
+    const err: any = new Error(error.message || "Failed to add expense");
+    err.response = { data: error };
+    throw err;
+  }
+
   return res.json();
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { UpdateBusinessExpense } from "@/types/database";
+import type { UpdateBusinessExpense } from "@/types/database";
 
 /**
  * GET /api/business-expenses/[id]
@@ -75,17 +75,17 @@ export async function PUT(
       );
     }
 
-    const updateData: UpdateBusinessExpense = {
-      category: body.category,
-      description: body.description,
-      amount: body.amount,
-      expense_date: body.expense_date,
-      notes: body.notes,
-    };
+    // Build update object with only provided fields
+    const updateData: any = {};
+    if (body.category !== undefined) updateData.category = body.category;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.amount !== undefined) updateData.amount = body.amount;
+    if (body.expense_date !== undefined) updateData.expense_date = body.expense_date;
+    if (body.notes !== undefined) updateData.notes = body.notes;
 
     const { data, error } = await supabase
       .from("business_expenses")
-      .update(updateData)
+      .update(updateData as never)
       .eq("id", id)
       .eq("user_id", user.id)
       .select()

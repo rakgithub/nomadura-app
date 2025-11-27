@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     if (tripsError) throw tripsError;
 
-    const tripIds = trips?.map((t) => t.id) || [];
+    const tripIds = trips?.map((t: any) => t.id) || [];
 
     // 2. Calculate total revenue
     let totalRevenue = 0;
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
         .in("participants.trip_id", tripIds);
 
       if (paymentsError) throw paymentsError;
-      totalRevenue = payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+      totalRevenue = payments?.reduce((sum, p: any) => sum + p.amount, 0) || 0;
     }
 
     // 3. Calculate total trip expenses
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
         .in("trip_id", tripIds);
 
       if (expensesError) throw expensesError;
-      tripExpenses = expenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
+      tripExpenses = expenses?.reduce((sum, e: any) => sum + e.amount, 0) || 0;
     }
 
     // 4. Calculate total business expenses
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     if (businessExpensesError) throw businessExpensesError;
     const totalBusinessExpenses =
-      businessExpenses?.reduce((sum, e) => sum + e.amount, 0) || 0;
+      businessExpenses?.reduce((sum, e: any) => sum + e.amount, 0) || 0;
 
     // 5. Calculate total withdrawals
     const { data: withdrawals, error: withdrawalsError } = await supabase
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     if (withdrawalsError) throw withdrawalsError;
     const totalWithdrawals =
-      withdrawals?.reduce((sum, w) => sum + w.amount, 0) || 0;
+      withdrawals?.reduce((sum, w: any) => sum + w.amount, 0) || 0;
 
     // 6. Calculate available withdrawable profit
     const summary = calculateFundSeparation(
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       notes: body.notes,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("withdrawals")
       .insert(insertData)
       .select()

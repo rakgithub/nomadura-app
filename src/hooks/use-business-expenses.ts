@@ -15,16 +15,21 @@ async function createBusinessExpense(data: {
   amount: number;
   expense_date?: string;
   notes?: string;
+  ignoreWarning?: boolean;
 }): Promise<BusinessExpense> {
   const res = await fetch("/api/business-expenses", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+
   if (!res.ok) {
     const error = await res.json();
-    throw new Error(error.error || "Failed to create business expense");
+    const err: any = new Error(error.error || error.message || "Failed to create business expense");
+    err.response = { data: error };
+    throw err;
   }
+
   return res.json();
 }
 
@@ -124,10 +129,11 @@ export const businessExpenseCategoryLabels: Record<
   string
 > = {
   rent: "Rent",
-  software: "Software & Tools",
+  software_tools: "Software & Tools",
+  fb_ads: "FB Ads",
   marketing: "Marketing",
-  insurance: "Insurance",
-  other: "Other",
+  utility_bills: "Utility & Bills",
+  travel: "Travel",
 };
 
 // Business expense category colors for badges
@@ -135,9 +141,10 @@ export const businessExpenseCategoryColors: Record<
   BusinessExpenseCategory,
   string
 > = {
-  rent: "bg-blue-100 text-blue-700",
-  software: "bg-purple-100 text-purple-700",
+  rent: "bg-orange-100 text-orange-700",
+  software_tools: "bg-purple-100 text-purple-700",
+  fb_ads: "bg-blue-100 text-blue-700",
   marketing: "bg-green-100 text-green-700",
-  insurance: "bg-indigo-100 text-indigo-700",
-  other: "bg-gray-100 text-gray-700",
+  utility_bills: "bg-amber-100 text-amber-700",
+  travel: "bg-teal-100 text-teal-700",
 };

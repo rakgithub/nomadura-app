@@ -6,10 +6,18 @@ import { useTrip, useUpdateTrip, useDeleteTrip } from "@/hooks/use-trips";
 import { useParticipants, useCreateParticipant, useUpdateParticipant } from "@/hooks/use-participants";
 import { useTripPayments, useCreatePayment } from "@/hooks/use-payments";
 import { useExpenses, useCreateExpense, expenseCategoryLabels, expenseCategoryColors } from "@/hooks/use-expenses";
+import { useAdvancePayments, useCreateAdvancePayment } from "@/hooks/use-advance-payments";
 import { Participant, ExpenseCategory } from "@/types/database";
 import { TripForm } from "@/components/trips/trip-form";
 import { ParticipantForm, ParticipantFormData } from "@/components/trips/participant-form";
 import { ParticipantCard } from "@/components/trips/participant-card";
+import { TotalAdvanceCard } from "@/components/trips/total-advance-card";
+import { TripReserveLockedCard } from "@/components/trips/trip-reserve-locked-card";
+import { SpendableTripCard } from "@/components/trips/spendable-trip-card";
+import { SpendableBusinessCard } from "@/components/trips/spendable-business-card";
+import { LockedProfitCard } from "@/components/trips/locked-profit-card";
+import { CompleteTripModal } from "@/components/trips/complete-trip-modal";
+import { CompletedTripSummary } from "@/components/trips/completed-trip-summary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loading } from "@/components/ui/loading";
@@ -18,7 +26,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ArrowLeft, Edit, Trash2, Users, Receipt, CreditCard, Plus, Calendar } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Edit, Trash2, Users, Receipt, CreditCard, Plus, Calendar, AlertCircle, CheckCircle, Info } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TripStatus } from "@/types/database";
@@ -30,6 +39,7 @@ export default function TripDetailPage() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [showRecordPayment, setShowRecordPayment] = useState(false);
@@ -37,22 +47,33 @@ export default function TripDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [paymentNotes, setPaymentNotes] = useState("");
+  // All payments are advance payments by default (per newprd.md)
+  const isAdvancePayment = true;
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory | "">("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
   const [expenseNotes, setExpenseNotes] = useState("");
+  const [showExpenseWarning, setShowExpenseWarning] = useState(false);
+  const [expenseWarningData, setExpenseWarningData] = useState<{
+    tripName: string;
+    tripReserveBalance: number;
+    expenseAmount: number;
+    shortfall: number;
+  } | null>(null);
 
   const { data: trip, isLoading, error, refetch } = useTrip(id);
   const { data: participants = [] } = useParticipants(id);
   const { data: tripPayments = [] } = useTripPayments(id);
   const { data: expenses = [] } = useExpenses(id);
+  const { data: advancePayments = [] } = useAdvancePayments(id);
   const updateTrip = useUpdateTrip();
   const deleteTrip = useDeleteTrip();
   const createParticipant = useCreateParticipant();
   const updateParticipant = useUpdateParticipant();
   const createPayment = useCreatePayment();
+  const createAdvancePayment = useCreateAdvancePayment();
   const createExpense = useCreateExpense();
 
   const handleAddParticipant = async (data: ParticipantFormData) => {
@@ -84,15 +105,30 @@ export default function TripDetailPage() {
   const handleRecordPayment = async () => {
     if (!paymentParticipantId || !paymentAmount) return;
     try {
-      await createPayment.mutateAsync({
-        tripId: id,
-        participantId: paymentParticipantId,
-        data: {
-          amount: Number(paymentAmount),
+      const amount = Number(paymentAmount);
+
+      if (isAdvancePayment) {
+        // Create advance payment with automatic split
+        await createAdvancePayment.mutateAsync({
+          trip_id: id,
+          participant_id: paymentParticipantId,
+          amount: amount,
           payment_date: paymentDate,
-          notes: paymentNotes || undefined,
-        },
-      });
+          notes: paymentNotes || null,
+        });
+      } else {
+        // Create regular payment
+        await createPayment.mutateAsync({
+          tripId: id,
+          participantId: paymentParticipantId,
+          data: {
+            amount: amount,
+            payment_date: paymentDate,
+            notes: paymentNotes || undefined,
+          },
+        });
+      }
+
       setShowRecordPayment(false);
       setPaymentParticipantId("");
       setPaymentAmount("");
@@ -103,7 +139,7 @@ export default function TripDetailPage() {
     }
   };
 
-  const handleAddExpense = async () => {
+  const handleAddExpense = async (ignoreWarning = false) => {
     if (!expenseCategory || !expenseDescription || !expenseAmount) return;
     try {
       await createExpense.mutateAsync({
@@ -114,6 +150,7 @@ export default function TripDetailPage() {
           amount: Number(expenseAmount),
           expense_date: expenseDate,
           notes: expenseNotes || undefined,
+          ignoreWarning,
         },
       });
       setShowAddExpense(false);
@@ -122,9 +159,28 @@ export default function TripDetailPage() {
       setExpenseAmount("");
       setExpenseNotes("");
       setExpenseDate(new Date().toISOString().split("T")[0]);
-    } catch (error) {
+      setShowExpenseWarning(false);
+      setExpenseWarningData(null);
+    } catch (error: any) {
+      // Check if this is a warning response
+      if (error.response?.data?.warning) {
+        const data = error.response.data;
+        setExpenseWarningData({
+          tripName: data.tripName,
+          tripReserveBalance: data.tripReserveBalance,
+          expenseAmount: data.expenseAmount,
+          shortfall: data.shortfall,
+        });
+        setShowExpenseWarning(true);
+        return;
+      }
       console.error("Failed to add expense:", error);
     }
+  };
+
+  const handleProceedWithExpense = async () => {
+    setShowExpenseWarning(false);
+    await handleAddExpense(true);
   };
 
   const handleUpdate = async (data: {
@@ -155,21 +211,21 @@ export default function TripDetailPage() {
     }
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
     }).format(amount);
   };
+
+  // Validation for completing trip
+  const isMinimumParticipantsMet = !trip?.min_participants || participants.length >= trip.min_participants;
+  const areAllPaymentsReceived = participants.every((participant) => {
+    if (!trip?.price_per_participant) return true; // If no price set, consider it valid
+    const amountDue = trip.price_per_participant - participant.amount_paid;
+    return amountDue <= 0; // All participants must have paid in full
+  });
+  const canCompleteTrip = isMinimumParticipantsMet && areAllPaymentsReceived && trip?.total_advance_received && trip.total_advance_received > 0;
 
   if (isLoading) {
     return <Loading className="min-h-[400px]" size="lg" />;
@@ -198,17 +254,81 @@ export default function TripDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditing(true)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
+          {/* Show Complete button only for active trips */}
+          {(trip.status === "upcoming" || trip.status === "in_progress") && (
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <Button
+                        onClick={() => setShowCompleteModal(true)}
+                        className="bg-amber-600 hover:bg-amber-700"
+                        disabled={!canCompleteTrip}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Mark as Completed
+                      </Button>
+                    </div>
+                  </TooltipTrigger>
+                  {!canCompleteTrip && (
+                    <TooltipContent className="max-w-xs">
+                      <div className="space-y-1 text-sm">
+                        <p className="font-semibold">Cannot complete trip yet:</p>
+                        {!isMinimumParticipantsMet && (
+                          <p className="text-red-600">• Minimum participants not met ({participants.length}/{trip.min_participants})</p>
+                        )}
+                        {!areAllPaymentsReceived && (
+                          <p className="text-red-600">• Not all participants have paid in full</p>
+                        )}
+                        {(!trip.total_advance_received || trip.total_advance_received === 0) && (
+                          <p className="text-red-600">• No advance payments received</p>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-2 text-sm">
+                      <p className="font-semibold">Requirements to complete trip:</p>
+                      <div className="space-y-1">
+                        <p className={isMinimumParticipantsMet ? "text-green-600" : "text-muted-foreground"}>
+                          {isMinimumParticipantsMet ? "✓" : "○"} Minimum participants met ({participants.length}/{trip.min_participants || "N/A"})
+                        </p>
+                        <p className={areAllPaymentsReceived ? "text-green-600" : "text-muted-foreground"}>
+                          {areAllPaymentsReceived ? "✓" : "○"} All participants paid in full
+                        </p>
+                        <p className={(trip.total_advance_received && trip.total_advance_received > 0) ? "text-green-600" : "text-muted-foreground"}>
+                          {(trip.total_advance_received && trip.total_advance_received > 0) ? "✓" : "○"} Advance payments received
+                        </p>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+          {trip.status !== "completed" && (
+            <>
+              <Button variant="outline" onClick={() => setIsEditing(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -254,63 +374,55 @@ export default function TripDetailPage() {
           {/* Overview Tab */}
           <TabsContent value="overview">
             <div className="space-y-6">
-              {/* Financial Summary Cards */}
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Payments
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-600">
-                      {formatCurrency(tripPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {tripPayments.length} payment{tripPayments.length !== 1 ? 's' : ''}
-                    </p>
-                  </CardContent>
-                </Card>
+              {/* Show Completed Summary for completed trips */}
+              {trip.status === 'completed' ? (
+                <CompletedTripSummary
+                  finalProfit={trip.released_profit ?? 0}
+                  reserveReleased={trip.trip_reserve_balance ?? 0}
+                  tripSpendReleased={Math.max(0, trip.operating_account ?? 0)}
+                  completedAt={trip.updated_at}
+                />
+              ) : (
+                /* Trip Money Flow - New Model per newprd.md - For Active Trips */
+                (trip.total_advance_received ?? 0) > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold">Trip Money Flow</h3>
+                    <div className="grid gap-3 grid-cols-5">
+                      {/* Card 1: Total Advance */}
+                      <TotalAdvanceCard
+                        amount={trip.total_advance_received ?? 0}
+                        paymentCount={advancePayments.length}
+                      />
 
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Total Expenses
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-red-600">
-                      {formatCurrency(expenses.reduce((sum, e) => sum + Number(e.amount), 0))}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {expenses.length} expense{expenses.length !== 1 ? 's' : ''}
-                    </p>
-                  </CardContent>
-                </Card>
+                      {/* Card 2: Trip Reserve (Locked) */}
+                      <TripReserveLockedCard
+                        amount={trip.trip_reserve_balance ?? 0}
+                        reservePercentage={trip.reserve_percentage ?? 0.30}
+                      />
 
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      Net Balance
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-2xl font-bold ${
-                      tripPayments.reduce((sum, p) => sum + Number(p.amount), 0) - expenses.reduce((sum, e) => sum + Number(e.amount), 0) >= 0
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}>
-                      {formatCurrency(
-                        tripPayments.reduce((sum, p) => sum + Number(p.amount), 0) -
-                        expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-                      )}
+                      {/* Card 3: Spendable for This Trip */}
+                      <SpendableTripCard
+                        balance={trip.operating_account ?? 0}
+                        baseAmount={(trip.operating_account ?? 0) + (expenses?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0)}
+                        expensesSpent={expenses?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0}
+                      />
+
+                      {/* Card 4: Spendable for Business */}
+                      <SpendableBusinessCard
+                        amount={trip.business_account ?? 0}
+                      />
+
+                      {/* Card 5: Locked Profit */}
+                      <LockedProfitCard
+                        amount={(trip.trip_reserve_balance ?? 0) + Math.max(0, trip.operating_account ?? 0)}
+                        tripReserve={trip.trip_reserve_balance ?? 0}
+                        unusedTripSpend={Math.max(0, trip.operating_account ?? 0)}
+                        isCompleted={false}
+                      />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Payments - Expenses
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+                  </div>
+                )
+              )}
 
               {/* Participant Status */}
               {trip.min_participants && (
@@ -347,7 +459,7 @@ export default function TripDetailPage() {
                       ) : (
                         <div className="h-16 w-16 rounded-full bg-green-500 flex items-center justify-center">
                           <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="width" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
                       )}
@@ -404,7 +516,11 @@ export default function TripDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Participants ({participants.length})</CardTitle>
-                <Button size="sm" onClick={() => setShowAddParticipant(true)}>
+                <Button
+                  size="sm"
+                  onClick={() => setShowAddParticipant(true)}
+                  disabled={trip.status === "completed"}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Participant
                 </Button>
@@ -447,6 +563,7 @@ export default function TripDetailPage() {
                             pricePerParticipant={trip.price_per_participant}
                             formatCurrency={formatCurrency}
                             onEdit={() => setEditingParticipant(participant)}
+                            isReadOnly={trip.status === "completed"}
                           />
                         )}
                       </div>
@@ -476,17 +593,20 @@ export default function TripDetailPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>
-                  Payments ({tripPayments.length})
-                  {tripPayments.length > 0 && (
+                  All Payments ({tripPayments.length + advancePayments.length})
+                  {(tripPayments.length > 0 || advancePayments.length > 0) && (
                     <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      Total: {formatCurrency(tripPayments.reduce((sum, p) => sum + Number(p.amount), 0))}
+                      Total: {formatCurrency(
+                        tripPayments.reduce((sum, p) => sum + Number(p.amount), 0) +
+                        advancePayments.reduce((sum, a) => sum + Number(a.amount), 0)
+                      )}
                     </span>
                   )}
                 </CardTitle>
                 <Button
                   size="sm"
                   onClick={() => setShowRecordPayment(true)}
-                  disabled={participants.length === 0}
+                  disabled={participants.length === 0 || trip.status === "completed"}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Record Payment
@@ -544,6 +664,76 @@ export default function TripDetailPage() {
                           placeholder="Optional notes"
                         />
                       </div>
+
+                      {/* Advance Split Preview - Five-Bucket Model */}
+                      {paymentAmount && Number(paymentAmount) > 0 && (() => {
+                        // Calculate split per FIVE-BUCKET MODEL (newprd.md)
+                        const amount = Number(paymentAmount);
+                        const reservePercentage = trip.reserve_percentage ?? 0.60;
+                        const tripReserveAmount = amount * reservePercentage;
+                        const spendableAmount = amount - tripReserveAmount;
+                        const operatingAmount = spendableAmount * 0.5;
+                        const businessAmount = spendableAmount * 0.5;
+
+                        const reservePercent = Math.round(reservePercentage * 100);
+                        const operatingPercent = Math.round((operatingAmount / amount) * 100);
+                        const businessPercent = Math.round((businessAmount / amount) * 100);
+
+                        return (
+                          <div className="p-4 bg-muted rounded-md space-y-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <AlertCircle className="h-4 w-4 text-blue-600" />
+                              <h4 className="font-medium text-sm">Automatic Split Breakdown</h4>
+                            </div>
+
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">
+                                  Trip Reserve ({reservePercent}%)
+                                </span>
+                                <span className="font-medium text-blue-600">
+                                  {formatCurrency(tripReserveAmount)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground pl-4">
+                                Protected for trip expenses only
+                              </p>
+
+                              <div className="flex justify-between items-center pt-2 border-t">
+                                <span className="text-muted-foreground">
+                                  Operating Account ({operatingPercent}%)
+                                </span>
+                                <span className="font-medium text-green-600">
+                                  {formatCurrency(operatingAmount)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground pl-4">
+                                For trip operations (hotels, transport, etc.)
+                              </p>
+
+                              <div className="flex justify-between items-center pt-2 border-t">
+                                <span className="text-muted-foreground">
+                                  Business Account ({businessPercent}%)
+                                </span>
+                                <span className="font-medium text-purple-600">
+                                  {formatCurrency(businessAmount)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground pl-4">
+                                For business expenses (ads, tools, etc.)
+                              </p>
+                            </div>
+
+                            <div className="pt-3 border-t">
+                              <div className="flex justify-between font-medium">
+                                <span>Total</span>
+                                <span>{formatCurrency(amount)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
@@ -558,39 +748,55 @@ export default function TripDetailPage() {
                         </Button>
                         <Button
                           onClick={handleRecordPayment}
-                          disabled={!paymentParticipantId || !paymentAmount || createPayment.isPending}
+                          disabled={!paymentParticipantId || !paymentAmount || createPayment.isPending || createAdvancePayment.isPending}
                         >
-                          {createPayment.isPending ? "Recording..." : "Record Payment"}
+                          {(createPayment.isPending || createAdvancePayment.isPending) ? "Recording..." : "Record Payment"}
                         </Button>
                       </div>
                     </div>
                   </div>
                 )}
 
-                {tripPayments.length > 0 ? (
-                  <div className="space-y-3">
-                    {tripPayments.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <div className="font-medium">{payment.participant_name}</div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                            <Calendar className="h-3 w-3" />
-                            {new Date(payment.payment_date).toLocaleDateString()}
-                            {payment.notes && (
-                              <span>• {payment.notes}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium text-green-600">
-                            +{formatCurrency(payment.amount)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                {(tripPayments.length > 0 || advancePayments.length > 0) ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-sm">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-sm">Participant</th>
+                          <th className="text-left py-3 px-4 font-medium text-sm">Amount</th>
+                          <th className="text-left py-3 px-4 font-medium text-sm">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Combine and sort all payments by date - all are advance payments */}
+                        {[
+                          ...tripPayments.map(p => ({ ...p, payment_date: p.payment_date })),
+                          ...advancePayments.map(a => ({
+                            ...a,
+                            participant_name: participants.find(p => p.id === a.participant_id)?.name || 'Unknown',
+                            payment_date: a.payment_date
+                          }))
+                        ]
+                          .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
+                          .map((payment, index) => (
+                            <tr key={`payment-${payment.id}-${index}`} className="border-b hover:bg-muted/50">
+                              <td className="py-3 px-4 text-sm">
+                                {new Date(payment.payment_date).toLocaleDateString()}
+                              </td>
+                              <td className="py-3 px-4 text-sm font-medium">
+                                {payment.participant_name}
+                              </td>
+                              <td className="py-3 px-4 text-sm font-medium text-green-600">
+                                +{formatCurrency(Number(payment.amount))}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-muted-foreground">
+                                {payment.notes || '-'}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
                   !showRecordPayment && (
@@ -630,7 +836,11 @@ export default function TripDetailPage() {
                     </span>
                   )}
                 </CardTitle>
-                <Button size="sm" onClick={() => setShowAddExpense(true)}>
+                <Button
+                  size="sm"
+                  onClick={() => setShowAddExpense(true)}
+                  disabled={trip.status === "completed"}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Expense
                 </Button>
@@ -710,7 +920,7 @@ export default function TripDetailPage() {
                           Cancel
                         </Button>
                         <Button
-                          onClick={handleAddExpense}
+                          onClick={() => handleAddExpense()}
                           disabled={!expenseCategory || !expenseDescription || !expenseAmount || createExpense.isPending}
                         >
                           {createExpense.isPending ? "Adding..." : "Add Expense"}
@@ -770,6 +980,77 @@ export default function TripDetailPage() {
           </TabsContent>
         </Tabs>
       )}
+
+      {/* Trip Expense Warning Dialog */}
+      {expenseWarningData && (
+        <ConfirmDialog
+          open={showExpenseWarning}
+          onClose={() => setShowExpenseWarning(false)}
+          onConfirm={handleProceedWithExpense}
+          title="⚠️ Trip Reserve Insufficient"
+          description={
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-md">
+                <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-amber-900 mb-2">
+                    This expense exceeds the trip reserve!
+                  </p>
+                  <p className="text-sm text-amber-800">
+                    The trip "{expenseWarningData.tripName}" does not have enough reserved funds for this expense.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="font-medium">Available Trip Reserve:</span>
+                  <span className="font-semibold text-blue-600">
+                    {formatCurrency(expenseWarningData.tripReserveBalance)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="font-medium">Expense Amount:</span>
+                  <span className="font-semibold text-red-600">
+                    {formatCurrency(expenseWarningData.expenseAmount)}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 bg-red-50 px-3 rounded">
+                  <span className="font-medium text-red-800">Shortfall:</span>
+                  <span className="font-bold text-red-600">
+                    {formatCurrency(expenseWarningData.shortfall)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                This trip is over budget. Proceeding will create a deficit that may need to be covered from other sources.
+              </p>
+            </div>
+          }
+          confirmText="Proceed Anyway"
+          cancelText="Cancel"
+          variant="destructive"
+          isLoading={createExpense.isPending}
+        />
+      )}
+
+      {/* Complete Trip Modal */}
+      <CompleteTripModal
+        open={showCompleteModal}
+        onOpenChange={setShowCompleteModal}
+        trip={{
+          id: trip.id,
+          name: trip.name,
+          total_advance_received: trip.total_advance_received || 0,
+          trip_reserve_balance: trip.trip_reserve_balance || 0,
+          operating_account: trip.operating_account || 0,
+          business_account: trip.business_account || 0,
+        }}
+        totalExpenses={expenses.reduce((sum, e) => sum + Number(e.amount), 0)}
+        hasNoExpenses={expenses.length === 0}
+        isOverspent={(trip.operating_account || 0) < 0}
+      />
     </div>
   );
 }

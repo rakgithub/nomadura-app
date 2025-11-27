@@ -81,7 +81,7 @@ export async function PUT(
       notes: body.notes,
     };
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("withdrawals")
       .update(updateData)
       .eq("id", id)

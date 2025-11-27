@@ -44,7 +44,7 @@ export function DestinationList() {
 
   if (error) {
     return (
-      <ErrorDisplay message="Failed to load destinations" onRetry={refetch} />
+      <ErrorDisplay message="Failed to load destinations" retry={refetch} />
     );
   }
 
@@ -62,7 +62,7 @@ export function DestinationList() {
         <CardContent>
           {!destinations || destinations.length === 0 ? (
             <EmptyState
-              message="No destinations yet"
+              title="No destinations yet"
               description="Add your first destination using the form above"
             />
           ) : (
@@ -122,7 +122,7 @@ export function DestinationList() {
         onConfirm={handleDelete}
         title="Delete Destination"
         description="Are you sure you want to delete this destination? Trips using this destination will have their destination unset."
-        isPending={deleteDestination.isPending}
+        isLoading={deleteDestination.isPending}
       />
     </>
   );

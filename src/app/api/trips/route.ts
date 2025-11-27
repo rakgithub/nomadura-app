@@ -59,6 +59,13 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
 
+  console.log('CREATE TRIP - Received body.reserve_percentage:', body.reserve_percentage, 'Type:', typeof body.reserve_percentage);
+
+  // Ensure reserve_percentage is properly formatted for DECIMAL(3,2) database type
+  const reservePercentage = body.reserve_percentage !== undefined
+    ? parseFloat(Number(body.reserve_percentage).toFixed(2))
+    : 0.60;
+
   const insertData = {
     user_id: user.id,
     name: body.name,
@@ -68,9 +75,12 @@ export async function POST(request: NextRequest) {
     status: body.status || "upcoming",
     min_participants: body.min_participants,
     price_per_participant: body.price_per_participant,
+    reserve_percentage: reservePercentage,
     notes: body.notes,
     destination_id: body.destination_id,
   };
+
+  console.log('CREATE TRIP - insertData.reserve_percentage:', insertData.reserve_percentage, 'Type:', typeof insertData.reserve_percentage);
 
   const { data, error } = await supabase
     .from("trips")

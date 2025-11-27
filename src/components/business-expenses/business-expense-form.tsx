@@ -12,7 +12,7 @@ import { BusinessExpenseCategory } from "@/types/database";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function BusinessExpenseForm() {
-  const [category, setCategory] = useState<BusinessExpenseCategory>("other");
+  const [category, setCategory] = useState<BusinessExpenseCategory>("rent");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [expenseDate, setExpenseDate] = useState(
@@ -53,7 +53,7 @@ export function BusinessExpenseForm() {
       setDescription("");
       setAmount("");
       setNotes("");
-      setCategory("other");
+      setCategory("rent");
       setExpenseDate(new Date().toISOString().split("T")[0]);
     } catch (err) {
       setError(

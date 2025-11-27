@@ -62,6 +62,10 @@ export async function PUT(
   if (body.status !== undefined) updateData.status = body.status;
   if (body.min_participants !== undefined) updateData.min_participants = body.min_participants;
   if (body.price_per_participant !== undefined) updateData.price_per_participant = body.price_per_participant;
+  if (body.reserve_percentage !== undefined) {
+    // Ensure reserve_percentage is properly formatted for DECIMAL(3,2) database type
+    updateData.reserve_percentage = parseFloat(Number(body.reserve_percentage).toFixed(2));
+  }
   if (body.notes !== undefined) updateData.notes = body.notes;
 
   const { data, error } = await supabase

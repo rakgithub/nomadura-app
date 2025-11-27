@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactNode } from "react";
 import { Dialog, DialogHeader, DialogContent, DialogFooter } from "./dialog";
 import { Button } from "./button";
 
@@ -8,7 +9,7 @@ interface ConfirmDialogProps {
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  description: string;
+  description: string | ReactNode;
   confirmText?: string;
   cancelText?: string;
   variant?: "default" | "destructive";
@@ -30,7 +31,11 @@ export function ConfirmDialog({
     <Dialog open={open} onClose={onClose}>
       <DialogHeader onClose={onClose}>{title}</DialogHeader>
       <DialogContent>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        {typeof description === "string" ? (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        ) : (
+          description
+        )}
       </DialogContent>
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={isLoading}>

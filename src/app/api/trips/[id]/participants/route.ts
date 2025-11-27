@@ -29,7 +29,7 @@ export async function GET(
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   }
 
-  const { data, error } = await supabase
+  const { data: participants, error } = await supabase
     .from("participants")
     .select("*")
     .eq("trip_id", id)
@@ -39,7 +39,43 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  // Calculate actual amount paid including both regular payments and advance payments
+  if (participants) {
+    const participantsWithPayments = await Promise.all(
+      participants.map(async (participant: any) => {
+        // Get regular payments
+        const { data: payments } = await (supabase as any)
+          .from("payments")
+          .select("amount")
+          .eq("participant_id", participant.id);
+
+        // Get advance payments
+        const { data: advancePayments } = await (supabase as any)
+          .from("advance_payments")
+          .select("amount")
+          .eq("participant_id", participant.id);
+
+        const regularPaymentsTotal = payments?.reduce(
+          (sum: number, p: any) => sum + (Number(p.amount) || 0),
+          0
+        ) || 0;
+
+        const advancePaymentsTotal = advancePayments?.reduce(
+          (sum: number, ap: any) => sum + (Number(ap.amount) || 0),
+          0
+        ) || 0;
+
+        return {
+          ...participant,
+          amount_paid: regularPaymentsTotal + advancePaymentsTotal,
+        };
+      })
+    );
+
+    return NextResponse.json(participantsWithPayments);
+  }
+
+  return NextResponse.json(participants);
 }
 
 // POST /api/trips/[id]/participants - Add participant to trip
