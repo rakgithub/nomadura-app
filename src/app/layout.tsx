@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   description: "Financial management application for Nomadura travel company",
 };
 
+// Force dynamic rendering to ensure environment variables are available
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: {
