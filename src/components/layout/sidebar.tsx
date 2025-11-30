@@ -34,11 +34,11 @@ const navItems = [
     href: "/transfers",
     icon: ArrowRightLeft,
   },
-  {
-    title: "Withdrawals",
-    href: "/withdrawals",
-    icon: Wallet,
-  },
+  // {
+  //   title: "Withdrawals",
+  //   href: "/withdrawals",
+  //   icon: Wallet,
+  // },
 ];
 
 export function Sidebar() {
