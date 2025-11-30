@@ -1,24 +1,19 @@
 "use client";
 
 import { useFinancialSummary, FinancialPeriod } from "@/hooks/use-financial-summary";
-import { BusinessRevenueCard } from "./business-revenue-card";
-import { OperatingAccountCard } from "./operating-account-card";
-import { WithdrawableProfitCard } from "./withdrawable-profit-card";
 import { BankBalanceCard } from "./bank-balance-card";
-import { LockedAdvanceCard } from "./locked-advance-card";
+import { ProfitCard } from "./profit-card";
 import { TripReservesCard } from "./trip-reserves-card";
 import { BusinessAccountCard } from "./business-account-card";
-import { ProfitCard } from "./profit-card";
 import { TripBalancesCard } from "./trip-balances-card";
 import { Loading } from "@/components/ui/loading";
 import { ErrorDisplay } from "@/components/ui/error";
 
 interface FinancialSummaryProps {
-  onWithdraw?: () => void;
   period?: FinancialPeriod;
 }
 
-export function FinancialSummary({ onWithdraw, period = "all" }: FinancialSummaryProps) {
+export function FinancialSummary({ period = "all" }: FinancialSummaryProps) {
   const { data: summary, isLoading, error, refetch } = useFinancialSummary(period);
 
   if (isLoading) {
@@ -60,9 +55,9 @@ export function FinancialSummary({ onWithdraw, period = "all" }: FinancialSummar
 
         {/* Total Profit - From completed trips */}
         <ProfitCard
-          profit={summary.profitPool}
-          withdrawableProfit={summary.withdrawableProfit}
-          totalWithdrawals={summary.totalWithdrawals}
+          profit={summary.profit || 0}
+          withdrawableProfit={summary.withdrawableProfit || 0}
+          totalWithdrawals={summary.totalWithdrawals || 0}
         />
 
         {/* Business Balance - Global business budget */}
@@ -80,27 +75,9 @@ export function FinancialSummary({ onWithdraw, period = "all" }: FinancialSummar
 
         {/* Upcoming Locked Reserve - Will convert to profit */}
         <TripReservesCard
-          amount={summary.upcomingLockedReserve || summary.tripReserve || summary.totalTripReserves}
+          amount={summary.upcomingLockedReserve ?? summary.tripReserve ?? 0}
         />
       </div>
-
-      {/* Legacy/Reference Cards (can be removed later) */}
-      {/* <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <BusinessRevenueCard
-          earnedRevenue={summary.earnedRevenue}
-          totalAdvanceReceived={summary.totalAdvanceReceived}
-          profitPool={summary.profitPool}
-        />
-        <WithdrawableProfitCard
-          amount={summary.withdrawableProfit}
-          profitPool={summary.profitPool}
-          totalWithdrawals={summary.totalWithdrawals}
-          onWithdraw={onWithdraw}
-        />
-        <LockedAdvanceCard
-          amount={summary.totalLockedAdvance}
-        />
-      </div> */}
     </div>
   );
 }

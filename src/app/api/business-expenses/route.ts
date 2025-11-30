@@ -80,28 +80,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // NEW: Check Operating Account balance using reserve requirement logic
+    // NEW: Check Business Account balance per Five-Bucket Model
     // Fetch current financial data
-    const [tripsResult, businessExpensesResult, withdrawalsResult, transfersResult] = await Promise.all([
+    const [tripsResult, advancePaymentsResult, businessExpensesResult, globalTransfersResult] = await Promise.all([
       supabase
         .from("trips")
         .select("id, status, total_advance_received, estimated_cost, earned_revenue")
         .eq("user_id", user.id),
       supabase
+        .from("advance_payments")
+        .select("amount, business_amount, trips!inner(user_id)")
+        .eq("trips.user_id", user.id),
+      supabase
         .from("business_expenses")
         .select("amount")
         .eq("user_id", user.id),
       supabase
-        .from("withdrawals")
-        .select("amount")
-        .eq("user_id", user.id),
-      supabase
-        .from("transfers")
-        .select("amount")
+        .from("global_transfers")
+        .select("from_bucket, to_bucket, amount")
         .eq("user_id", user.id),
     ]);
 
-    if (tripsResult.error || businessExpensesResult.error || withdrawalsResult.error || transfersResult.error) {
+    if (tripsResult.error || advancePaymentsResult.error || businessExpensesResult.error || globalTransfersResult.error) {
       return NextResponse.json(
         { error: "Failed to fetch financial data" },
         { status: 500 }
@@ -109,86 +109,50 @@ export async function POST(request: NextRequest) {
     }
 
     const trips = tripsResult.data || [];
+    const advancePayments = advancePaymentsResult.data || [];
     const businessExpenses = businessExpensesResult.data || [];
-    const withdrawals = withdrawalsResult.data || [];
-    const transfers = transfersResult.data || [];
+    const globalTransfers = globalTransfersResult.data || [];
 
-    // Calculate totals using NEW status-based logic
-    const totalAdvanceReceived = trips.reduce((sum, t: any) => sum + (Number(t.total_advance_received) || 0), 0);
+    // Calculate Business Account balance per Five-Bucket Model (newprd.md)
+    // Business Account = Business Base - Business Expenses
 
-    // Locked advance: sum of advances for trips NOT completed (status-based)
-    const totalLockedAdvance = trips.reduce((sum, t: any) => {
-      if (t.status !== 'completed' && t.status !== 'cancelled') {
-        return sum + (Number(t.total_advance_received) || 0);
-      }
-      return sum;
+    // Business Base = sum of business_amount from all advance payments
+    const totalBusinessBase = advancePayments.reduce((sum: number, ap: any) => {
+      return sum + (Number(ap.business_amount) || 0);
     }, 0);
 
-    // Reserve requirement: sum of estimated costs for upcoming trips
-    const reserveRequirement = trips.reduce((sum, t: any) => {
-      if (t.status !== 'completed' && t.status !== 'cancelled') {
-        return sum + (Number(t.estimated_cost) || 0);
-      }
-      return sum;
-    }, 0);
-
-    const earnedRevenue = trips.reduce((sum, t: any) => {
-      if (t.status === 'completed') {
-        return sum + (Number(t.earned_revenue) || 0);
-      }
-      return sum;
-    }, 0);
-
+    // Total Business Expenses (current)
     const currentBusinessExpenses = businessExpenses.reduce((sum, e: any) => sum + Number(e.amount), 0);
-    const totalWithdrawals = withdrawals.reduce((sum, w: any) => sum + Number(w.amount), 0);
-    const totalTransfers = transfers.reduce((sum, t: any) => sum + Number(t.amount), 0);
 
-    // Get trip expenses
-    const tripIds = trips.map((t: any) => t.id);
-    let tripExpenses = 0;
-    if (tripIds.length > 0) {
-      const tripExpensesResult = await supabase
-        .from("expenses")
-        .select("amount")
-        .in("trip_id", tripIds);
+    // Calculate Business Account before applying global transfers
+    let businessAccount = totalBusinessBase - currentBusinessExpenses;
 
-      tripExpenses = tripExpensesResult.data?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0;
+    // Apply global transfers to adjust Business Account balance
+    if (globalTransfers && globalTransfers.length > 0) {
+      globalTransfers.forEach((transfer: any) => {
+        const amount = Number(transfer.amount);
+
+        // Deduct if transferring FROM business account
+        if (transfer.from_bucket === 'business_account') {
+          businessAccount -= amount;
+        }
+
+        // Add if transferring TO business account
+        if (transfer.to_bucket === 'business_account') {
+          businessAccount += amount;
+        }
+      });
     }
 
-    // Calculate bank balance
-    const bankBalance = totalAdvanceReceived + earnedRevenue - tripExpenses - currentBusinessExpenses - totalWithdrawals;
-
-    // Calculate current financial state using NEW logic
-    const financialSummary = calculateAdvanceBasedFinancials(
-      bankBalance,
-      earnedRevenue,
-      totalAdvanceReceived,
-      totalLockedAdvance,
-      reserveRequirement,  // NEW: dynamic reserve requirement
-      tripExpenses,
-      currentBusinessExpenses,
-      totalWithdrawals,
-      totalTransfers
-    );
-
-    // Check if expense would cause reserve shortfall
+    // Validate that expense amount doesn't exceed available business account balance
     const expenseAmount = Number(body.amount);
-    const availableOperatingCash = financialSummary.operatingAccount;
-    const newBankBalance = bankBalance - expenseAmount;
-    const newReserveShortfall = Math.max(0, reserveRequirement - newBankBalance);
 
-    if (newReserveShortfall > 0 && !body.ignoreWarning) {
-      // Return warning - this expense would cause reserve shortfall
+    if (expenseAmount > businessAccount) {
       return NextResponse.json(
         {
-          warning: true,
-          message: "This expense will cause reserve shortfall",
-          availableOperatingCash,
-          expenseAmount,
-          reserveRequirement,
-          currentBankBalance: bankBalance,
-          newBankBalance,
-          reserveShortfall: newReserveShortfall,
+          error: `Insufficient funds in Business Account. Available: ₹${businessAccount.toFixed(2)}, Required: ₹${expenseAmount.toFixed(2)}`,
+          availableBalance: businessAccount,
+          requestedAmount: expenseAmount,
         },
         { status: 400 }
       );

@@ -57,6 +57,8 @@ supabase db execute < scripts/purge-data.sql
 - ✅ payments
 - ✅ advance_payments
 - ✅ expenses
+- ✅ trip_completion_logs
+- ✅ wallet_transfers
 - ✅ business_expenses
 - ✅ withdrawals
 - ✅ transfers
@@ -76,18 +78,20 @@ The script includes a verification query at the end that shows the count of reco
 
 Example output:
 ```
-table_name         | record_count
--------------------+-------------
-trips              | 0
-participants       | 0
-payments           | 0
-advance_payments   | 0
-expenses           | 0
-business_expenses  | 0
-withdrawals        | 0
-transfers          | 0
-destinations       | 0
-settings           | 0
+table_name               | record_count
+-------------------------+-------------
+advance_payments         | 0
+business_expenses        | 0
+destinations             | 0
+expenses                 | 0
+participants             | 0
+payments                 | 0
+settings                 | 0
+transfers                | 0
+trip_completion_logs     | 0
+trips                    | 0
+wallet_transfers         | 0
+withdrawals              | 0
 ```
 
 ### Safety Features

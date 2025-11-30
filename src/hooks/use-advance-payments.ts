@@ -81,6 +81,7 @@ export function useCreateAdvancePayment() {
       queryClient.invalidateQueries({ queryKey: ["advance-payments"] });
       queryClient.invalidateQueries({ queryKey: ["trips", data.trip_id] });
       queryClient.invalidateQueries({ queryKey: ["trips"] });
+      queryClient.invalidateQueries({ queryKey: ["participants", data.trip_id] });
       queryClient.invalidateQueries({ queryKey: ["financial-summary"] });
     },
   });
@@ -94,6 +95,7 @@ export function useDeleteAdvancePayment() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["advance-payments"] });
       queryClient.invalidateQueries({ queryKey: ["trips"] });
+      queryClient.invalidateQueries({ queryKey: ["participants"] });
       queryClient.invalidateQueries({ queryKey: ["financial-summary"] });
     },
   });

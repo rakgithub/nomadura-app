@@ -7,6 +7,7 @@ interface CompleteTripResponse {
   finalProfit: number;
   reserveReleased: number;
   tripSpendReleased: number;
+  businessAccountReleased: number;
   profitWalletBalance: number;
   breakdown: {
     total_advance_received: number;
@@ -16,6 +17,7 @@ interface CompleteTripResponse {
     total_expenses: number;
     reserve_released: number;
     trip_spend_released: number;
+    business_account_released: number;
     final_profit: number;
     completion_formula: string;
   };
@@ -36,6 +38,7 @@ export function useCompleteTrip() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.error("Complete trip API error:", error);
         throw new Error(error.error || "Failed to complete trip");
       }
 
@@ -45,9 +48,10 @@ export function useCompleteTrip() {
       // Invalidate all relevant queries to refresh data
       queryClient.invalidateQueries({ queryKey: ["trip", data.tripId] });
       queryClient.invalidateQueries({ queryKey: ["trips"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["financial-summary"] }); // Fixed: was "dashboard-summary"
       queryClient.invalidateQueries({ queryKey: ["advance-payments", data.tripId] });
       queryClient.invalidateQueries({ queryKey: ["expenses", data.tripId] });
+      queryClient.invalidateQueries({ queryKey: ["trip-completion", data.tripId] });
     },
   });
 }

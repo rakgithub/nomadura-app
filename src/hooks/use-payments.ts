@@ -80,6 +80,12 @@ export function useCreatePayment() {
       queryClient.invalidateQueries({
         queryKey: ["participants", variables.tripId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["trips", variables.tripId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["trips"],
+      });
     },
   });
 }

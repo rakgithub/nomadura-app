@@ -331,6 +331,41 @@ export interface Database {
           updated_at?: string;
         };
       };
+      global_transfers: {
+        Row: {
+          id: string;
+          user_id: string;
+          from_bucket: "profit_withdrawable" | "business_account" | "trip_balances" | "trip_reserves";
+          to_bucket: "trip_balances" | "business_account";
+          amount: number;
+          notes: string | null;
+          transfer_date: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          from_bucket: "profit_withdrawable" | "business_account" | "trip_balances" | "trip_reserves";
+          to_bucket: "trip_balances" | "business_account";
+          amount: number;
+          notes?: string | null;
+          transfer_date?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          from_bucket?: "profit_withdrawable" | "business_account" | "trip_balances" | "trip_reserves";
+          to_bucket?: "trip_balances" | "business_account";
+          amount?: number;
+          notes?: string | null;
+          transfer_date?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
       settings: {
         Row: {
           id: string;
@@ -421,6 +456,7 @@ export interface Database {
           final_profit: number;
           reserve_released: number;
           trip_spend_released: number;
+          business_account_released: number;
           total_advance_received: number;
           total_expenses: number;
           breakdown: Record<string, any> | null;
@@ -434,6 +470,7 @@ export interface Database {
           final_profit: number;
           reserve_released: number;
           trip_spend_released: number;
+          business_account_released?: number;
           total_advance_received: number;
           total_expenses: number;
           breakdown?: Record<string, any> | null;
@@ -447,6 +484,7 @@ export interface Database {
           final_profit?: number;
           reserve_released?: number;
           trip_spend_released?: number;
+          business_account_released?: number;
           total_advance_received?: number;
           total_expenses?: number;
           breakdown?: Record<string, any> | null;

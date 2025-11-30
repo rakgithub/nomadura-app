@@ -54,7 +54,6 @@ export function DashboardContent({ userEmail }: DashboardContentProps) {
           </div>
           <FinancialSummary
             period={financialPeriod}
-            onWithdraw={() => setWithdrawalModalOpen(true)}
           />
         </div>
       </div>

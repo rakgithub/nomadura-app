@@ -7,6 +7,7 @@ interface CompletedTripSummaryProps {
   finalProfit: number;
   reserveReleased: number;
   tripSpendReleased: number;
+  businessAccountReleased?: number;
   completedAt?: string;
 }
 
@@ -14,6 +15,7 @@ export function CompletedTripSummary({
   finalProfit,
   reserveReleased,
   tripSpendReleased,
+  businessAccountReleased = 0,
   completedAt,
 }: CompletedTripSummaryProps) {
   const formatCurrency = (value: number) => {
@@ -78,24 +80,48 @@ export function CompletedTripSummary({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-blue-700">Trip Reserve Released</span>
-                <span className="font-semibold text-blue-900">
-                  {formatCurrency(reserveReleased)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-blue-700">Unused Trip Budget</span>
-                <span className="font-semibold text-green-600">
-                  {formatCurrency(tripSpendReleased)}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-blue-200 flex justify-between font-semibold">
-                <span className="text-blue-900">Total Profit</span>
-                <span className="text-amber-600">
-                  {formatCurrency(finalProfit)}
-                </span>
-              </div>
+              {/* Show detailed breakdown only if we have it */}
+              {(reserveReleased > 0 || tripSpendReleased > 0 || businessAccountReleased > 0) ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Trip Reserve Released</span>
+                    <span className="font-semibold text-blue-900">
+                      {formatCurrency(reserveReleased)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Unused Trip Budget</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(tripSpendReleased)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-blue-700">Unused Business Budget</span>
+                    <span className="font-semibold text-green-600">
+                      {formatCurrency(businessAccountReleased)}
+                    </span>
+                  </div>
+                  <div className="pt-2 border-t border-blue-200 flex justify-between font-semibold">
+                    <span className="text-blue-900">Total Profit</span>
+                    <span className="text-amber-600">
+                      {formatCurrency(finalProfit)}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                /* For legacy trips without breakdown data */
+                <div className="space-y-3">
+                  <div className="flex justify-between font-semibold">
+                    <span className="text-blue-900">Total Profit Released</span>
+                    <span className="text-amber-600">
+                      {formatCurrency(finalProfit)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">
+                    Detailed breakdown not available for trips completed before the new system
+                  </p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

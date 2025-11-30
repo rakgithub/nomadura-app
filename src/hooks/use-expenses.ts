@@ -47,6 +47,22 @@ export function useExpenses(tripId: string) {
   });
 }
 
+async function deleteExpense({
+  tripId,
+  expenseId,
+}: {
+  tripId: string;
+  expenseId: string;
+}): Promise<void> {
+  const res = await fetch(`/api/trips/${tripId}/expenses/${expenseId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to delete expense");
+  }
+}
+
 export function useCreateExpense() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -54,6 +70,24 @@ export function useCreateExpense() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["expenses", variables.tripId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["trip", variables.tripId],
+      });
+    },
+  });
+}
+
+export function useDeleteExpense() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteExpense,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["expenses", variables.tripId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["trip", variables.tripId],
       });
     },
   });

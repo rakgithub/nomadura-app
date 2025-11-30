@@ -50,7 +50,8 @@ export function BusinessExpenseModal({
   const createExpense = useCreateBusinessExpense();
   const { data: financialSummary } = useFinancialSummary("all");
 
-  const canAddExpense = financialSummary && financialSummary.operatingAccount > 0;
+  const businessAccountBalance = financialSummary?.businessAccount ?? financialSummary?.businessBalance ?? 0;
+  const canAddExpense = financialSummary && businessAccountBalance > 0;
 
   const handleSubmit = async (e: React.FormEvent, ignoreWarning = false) => {
     e.preventDefault();
@@ -58,7 +59,7 @@ export function BusinessExpenseModal({
 
     // Check if funds are available
     if (!canAddExpense) {
-      setError("No funds available in Operating Account. Cannot add business expense.");
+      setError("No funds available in Business Account. Cannot add business expense.");
       return;
     }
 
@@ -72,6 +73,12 @@ export function BusinessExpenseModal({
 
     if (isNaN(amountNum) || amountNum <= 0) {
       setError("Please enter a valid amount greater than 0");
+      return;
+    }
+
+    // Check if amount exceeds available business account balance
+    if (amountNum > businessAccountBalance && !ignoreWarning) {
+      setError(`Amount exceeds available balance. Maximum allowed: ${formatCurrency(businessAccountBalance)}`);
       return;
     }
 
@@ -149,7 +156,7 @@ export function BusinessExpenseModal({
       <form onSubmit={handleSubmit}>
         <DialogContent>
           <div className="space-y-4">
-            {/* Operating Account Balance Display */}
+            {/* Business Account Balance Display */}
             {financialSummary && (
               <div className={`p-4 border rounded-lg ${
                 canAddExpense
@@ -173,13 +180,13 @@ export function BusinessExpenseModal({
                     <p className={`text-2xl font-bold ${
                       canAddExpense ? 'text-blue-900' : 'text-red-900'
                     }`}>
-                      {formatCurrency(financialSummary.operatingAccount)}
+                      {formatCurrency(businessAccountBalance)}
                     </p>
                     <p className={`text-xs mt-1 ${
                       canAddExpense ? 'text-blue-600' : 'text-red-600'
                     }`}>
                       {canAddExpense
-                        ? 'Operating Account Balance'
+                        ? 'Business Account Balance'
                         : 'No funds available - Cannot add expenses'
                       }
                     </p>

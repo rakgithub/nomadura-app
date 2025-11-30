@@ -14,6 +14,7 @@ TRUNCATE TABLE public.advance_payments CASCADE;
 TRUNCATE TABLE public.expenses CASCADE;
 TRUNCATE TABLE public.participants CASCADE;
 TRUNCATE TABLE public.trip_completion_logs CASCADE;
+TRUNCATE TABLE public.wallet_transfers CASCADE;
 
 -- Delete parent tables
 TRUNCATE TABLE public.trips CASCADE;
@@ -41,6 +42,8 @@ SELECT 'expenses', COUNT(*) FROM public.expenses
 UNION ALL
 SELECT 'trip_completion_logs', COUNT(*) FROM public.trip_completion_logs
 UNION ALL
+SELECT 'wallet_transfers', COUNT(*) FROM public.wallet_transfers
+UNION ALL
 SELECT 'business_expenses', COUNT(*) FROM public.business_expenses
 UNION ALL
 SELECT 'withdrawals', COUNT(*) FROM public.withdrawals
@@ -49,6 +52,12 @@ SELECT 'transfers', COUNT(*) FROM public.transfers
 UNION ALL
 SELECT 'destinations', COUNT(*) FROM public.destinations
 UNION ALL
-SELECT 'settings', COUNT(*) FROM public.settings;
+SELECT 'settings', COUNT(*) FROM public.settings
+ORDER BY table_name;
 
 -- All counts should be 0
+
+-- ============================================================================
+-- STEP 3: Summary
+-- ============================================================================
+SELECT 'PURGE COMPLETE - All data has been deleted' as status;

@@ -5,17 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useTrip, useUpdateTrip, useDeleteTrip } from "@/hooks/use-trips";
 import { useParticipants, useCreateParticipant, useUpdateParticipant } from "@/hooks/use-participants";
 import { useTripPayments, useCreatePayment } from "@/hooks/use-payments";
-import { useExpenses, useCreateExpense, expenseCategoryLabels, expenseCategoryColors } from "@/hooks/use-expenses";
+import { useExpenses, useCreateExpense, useDeleteExpense, expenseCategoryLabels, expenseCategoryColors } from "@/hooks/use-expenses";
 import { useAdvancePayments, useCreateAdvancePayment } from "@/hooks/use-advance-payments";
+import { useTripCompletion } from "@/hooks/use-trip-completion";
 import { Participant, ExpenseCategory } from "@/types/database";
 import { TripForm } from "@/components/trips/trip-form";
 import { ParticipantForm, ParticipantFormData } from "@/components/trips/participant-form";
 import { ParticipantCard } from "@/components/trips/participant-card";
-import { TotalAdvanceCard } from "@/components/trips/total-advance-card";
+import { TotalPaymentsCard } from "@/components/trips/total-payments-card";
+import { PendingPaymentsCard } from "@/components/trips/pending-payments-card";
 import { TripReserveLockedCard } from "@/components/trips/trip-reserve-locked-card";
-import { SpendableTripCard } from "@/components/trips/spendable-trip-card";
-import { SpendableBusinessCard } from "@/components/trips/spendable-business-card";
-import { LockedProfitCard } from "@/components/trips/locked-profit-card";
 import { CompleteTripModal } from "@/components/trips/complete-trip-modal";
 import { CompletedTripSummary } from "@/components/trips/completed-trip-summary";
 import { Button } from "@/components/ui/button";
@@ -68,6 +67,7 @@ export default function TripDetailPage() {
   const { data: tripPayments = [] } = useTripPayments(id);
   const { data: expenses = [] } = useExpenses(id);
   const { data: advancePayments = [] } = useAdvancePayments(id);
+  const { data: completionLog } = useTripCompletion(id);
   const updateTrip = useUpdateTrip();
   const deleteTrip = useDeleteTrip();
   const createParticipant = useCreateParticipant();
@@ -75,6 +75,7 @@ export default function TripDetailPage() {
   const createPayment = useCreatePayment();
   const createAdvancePayment = useCreateAdvancePayment();
   const createExpense = useCreateExpense();
+  const deleteExpense = useDeleteExpense();
 
   const handleAddParticipant = async (data: ParticipantFormData) => {
     try {
@@ -181,6 +182,19 @@ export default function TripDetailPage() {
   const handleProceedWithExpense = async () => {
     setShowExpenseWarning(false);
     await handleAddExpense(true);
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!confirm("Are you sure you want to delete this expense?")) return;
+
+    try {
+      await deleteExpense.mutateAsync({
+        tripId: id,
+        expenseId,
+      });
+    } catch (error) {
+      console.error("Failed to delete expense:", error);
+    }
   };
 
   const handleUpdate = async (data: {
@@ -377,51 +391,47 @@ export default function TripDetailPage() {
               {/* Show Completed Summary for completed trips */}
               {trip.status === 'completed' ? (
                 <CompletedTripSummary
-                  finalProfit={trip.released_profit ?? 0}
-                  reserveReleased={trip.trip_reserve_balance ?? 0}
-                  tripSpendReleased={Math.max(0, trip.operating_account ?? 0)}
-                  completedAt={trip.updated_at}
+                  finalProfit={completionLog?.final_profit ?? trip.released_profit ?? 0}
+                  reserveReleased={completionLog?.reserve_released ?? 0}
+                  tripSpendReleased={completionLog?.trip_spend_released ?? 0}
+                  businessAccountReleased={completionLog?.business_account_released ?? 0}
+                  completedAt={completionLog?.completed_at ?? trip.updated_at}
                 />
               ) : (
-                /* Trip Money Flow - New Model per newprd.md - For Active Trips */
-                (trip.total_advance_received ?? 0) > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-semibold">Trip Money Flow</h3>
-                    <div className="grid gap-3 grid-cols-5">
-                      {/* Card 1: Total Advance */}
-                      <TotalAdvanceCard
-                        amount={trip.total_advance_received ?? 0}
-                        paymentCount={advancePayments.length}
-                      />
+                /* Trip Money Flow - For Active Trips */
+                (() => {
+                  // Calculate payment status based on participant payments
+                  const pricePerParticipant = trip.price_per_participant ?? 0;
+                  const totalExpectedFromParticipants = participants.length * pricePerParticipant;
+                  const totalPaidByParticipants = participants.reduce((sum, p) => sum + (p.amount_paid ?? 0), 0);
+                  const pendingFromParticipants = Math.max(0, totalExpectedFromParticipants - totalPaidByParticipants);
 
-                      {/* Card 2: Trip Reserve (Locked) */}
-                      <TripReserveLockedCard
-                        amount={trip.trip_reserve_balance ?? 0}
-                        reservePercentage={trip.reserve_percentage ?? 0.30}
-                      />
+                  return (trip.total_advance_received ?? 0) > 0 || participants.length > 0 ? (
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold">Trip Money Flow</h3>
+                      <div className="grid gap-3 grid-cols-3">
+                        {/* Card 1: Total Payments */}
+                        <TotalPaymentsCard
+                          amount={trip.total_advance_received ?? 0}
+                          paymentCount={advancePayments.length}
+                        />
 
-                      {/* Card 3: Spendable for This Trip */}
-                      <SpendableTripCard
-                        balance={trip.operating_account ?? 0}
-                        baseAmount={(trip.operating_account ?? 0) + (expenses?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0)}
-                        expensesSpent={expenses?.reduce((sum, e: any) => sum + Number(e.amount), 0) || 0}
-                      />
+                        {/* Card 2: Pending Payments */}
+                        <PendingPaymentsCard
+                          amount={pendingFromParticipants}
+                          totalCost={totalExpectedFromParticipants}
+                          totalReceived={totalPaidByParticipants}
+                        />
 
-                      {/* Card 4: Spendable for Business */}
-                      <SpendableBusinessCard
-                        amount={trip.business_account ?? 0}
-                      />
-
-                      {/* Card 5: Locked Profit */}
-                      <LockedProfitCard
-                        amount={(trip.trip_reserve_balance ?? 0) + Math.max(0, trip.operating_account ?? 0)}
-                        tripReserve={trip.trip_reserve_balance ?? 0}
-                        unusedTripSpend={Math.max(0, trip.operating_account ?? 0)}
-                        isCompleted={false}
-                      />
+                        {/* Card 3: Trip Reserve */}
+                        <TripReserveLockedCard
+                          amount={trip.trip_reserve_balance ?? 0}
+                          reservePercentage={trip.reserve_percentage ?? 0.30}
+                        />
+                      </div>
                     </div>
-                  </div>
-                )
+                  ) : null;
+                })()
               )}
 
               {/* Participant Status */}
@@ -937,7 +947,7 @@ export default function TripDetailPage() {
                         key={expense.id}
                         className="flex items-center justify-between p-3 border rounded-lg"
                       >
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium">{expense.description}</div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${expenseCategoryColors[expense.category]}`}>
@@ -952,10 +962,22 @@ export default function TripDetailPage() {
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-medium text-destructive">
-                            -{formatCurrency(expense.amount)}
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="font-medium text-destructive">
+                              -{formatCurrency(expense.amount)}
+                            </div>
                           </div>
+                          {trip.status !== "completed" && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                              disabled={deleteExpense.isPending}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}

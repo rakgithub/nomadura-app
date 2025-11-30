@@ -50,7 +50,8 @@ export function CompleteTripModal({
   };
 
   const remainingTripSpend = Math.max(0, trip.operating_account);
-  const finalProfit = trip.trip_reserve_balance + remainingTripSpend;
+  const remainingBusinessBudget = Math.max(0, trip.business_account);
+  const finalProfit = trip.trip_reserve_balance + remainingTripSpend + remainingBusinessBudget;
 
   const handleConfirm = async () => {
     try {
@@ -125,6 +126,10 @@ export function CompleteTripModal({
               <span className="text-muted-foreground">Remaining Trip Spend</span>
               <span className="font-semibold text-green-600">{formatCurrency(remainingTripSpend)}</span>
             </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Remaining Business Budget</span>
+              <span className="font-semibold text-green-600">{formatCurrency(remainingBusinessBudget)}</span>
+            </div>
           </div>
 
           {/* Final Profit */}
@@ -142,7 +147,7 @@ export function CompleteTripModal({
               This amount will be added to your Profit Wallet
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Formula: Trip Reserve + Remaining Trip Spend
+              Formula: Trip Reserve + Remaining Trip Spend + Remaining Business Budget
             </p>
           </div>
 
@@ -159,6 +164,15 @@ export function CompleteTripModal({
             </div>
           )}
         </div>
+
+        {/* Error Display */}
+        {completeTrip.isError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-900">
+              <strong>Error:</strong> {completeTrip.error?.message || "Failed to complete trip. Please try again."}
+            </p>
+          </div>
+        )}
 
         <DialogFooter className="gap-2">
           <Button

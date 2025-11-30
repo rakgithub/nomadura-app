@@ -56,11 +56,66 @@ export async function POST(
     const trip = data as Trip;
 
     // 2. Validation checks
+    // If trip is already completed, check if released_profit is set
     if (trip.status === "completed") {
-      return NextResponse.json(
-        { error: "Trip is already completed" },
-        { status: 400 }
-      );
+      const releasedProfit = Number(trip.released_profit) || 0;
+
+      // If released_profit is missing or 0, try to get it from completion log
+      if (releasedProfit === 0) {
+        const { data: completionLog } = await supabase
+          .from("trip_completion_logs")
+          .select("final_profit")
+          .eq("trip_id", tripId)
+          .eq("user_id", user.id)
+          .single();
+
+        const finalProfit = (completionLog as any)?.final_profit;
+        if (completionLog && finalProfit > 0) {
+          // Fix the trip record with the correct released_profit from completion log
+          await (supabase as any)
+            .from("trips")
+            .update({ released_profit: finalProfit })
+            .eq("id", tripId)
+            .eq("user_id", user.id);
+
+          console.log(`Fixed trip ${tripId}: set released_profit to ${finalProfit}`);
+
+          // Update the trip object for the response
+          (trip as any).released_profit = finalProfit;
+        }
+      }
+
+      // Get existing profit data
+      const { data: summary } = await supabase
+        .from("trips")
+        .select("released_profit")
+        .eq("user_id", user.id);
+
+      const totalProfit = summary?.reduce((sum, t: any) => sum + (Number(t.released_profit) || 0), 0) || 0;
+
+      return NextResponse.json({
+        success: true,
+        tripId: tripId,
+        status: "completed",
+        finalProfit: Number((trip as any).released_profit) || 0,
+        reserveReleased: 0,
+        tripSpendReleased: 0,
+        businessAccountReleased: 0,
+        profitWalletBalance: totalProfit,
+        breakdown: {
+          total_advance_received: Number(trip.total_advance_received) || 0,
+          trip_reserve_balance: 0,
+          operating_account: 0,
+          business_account: 0,
+          total_expenses: 0,
+          reserve_released: 0,
+          trip_spend_released: 0,
+          business_account_released: 0,
+          final_profit: Number((trip as any).released_profit) || 0,
+          completion_formula: "Already completed",
+        },
+        message: "Trip was already completed.",
+      });
     }
 
     if (trip.status === "cancelled") {
@@ -82,10 +137,11 @@ export async function POST(
     const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
     // 4. Calculate final profit
-    // Final Profit = Trip Reserve + Remaining Trip Spend (operating_account)
+    // Final Profit = Trip Reserve + Remaining Trip Spend + Remaining Business Budget
     const reserveReleased = Number(trip.trip_reserve_balance) || 0;
     const tripSpendReleased = Math.max(0, Number(trip.operating_account) || 0);
-    const finalProfit = reserveReleased + tripSpendReleased;
+    const businessAccountReleased = Math.max(0, Number(trip.business_account) || 0);
+    const finalProfit = reserveReleased + tripSpendReleased + businessAccountReleased;
 
     // 5. Create completion breakdown for audit
     const breakdown = {
@@ -96,8 +152,9 @@ export async function POST(
       total_expenses: totalExpenses,
       reserve_released: reserveReleased,
       trip_spend_released: tripSpendReleased,
+      business_account_released: businessAccountReleased,
       final_profit: finalProfit,
-      completion_formula: "Trip Reserve + Remaining Trip Spend",
+      completion_formula: "Trip Reserve + Remaining Trip Spend + Remaining Business Budget",
     };
 
     // 6. Update trip to completed status
@@ -110,12 +167,16 @@ export async function POST(
         released_profit: finalProfit,
         trip_reserve_balance: 0,
         operating_account: 0,
+        business_account: 0,
         updated_at: new Date().toISOString(),
       })
       .eq("id", tripId)
       .eq("user_id", user.id);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("Failed to update trip:", updateError);
+      throw updateError;
+    }
 
     // 7. Create completion log entry
     const { error: logError } = await (supabase as any)
@@ -126,13 +187,17 @@ export async function POST(
         final_profit: finalProfit,
         reserve_released: reserveReleased,
         trip_spend_released: tripSpendReleased,
+        business_account_released: businessAccountReleased,
         total_advance_received: Number(trip.total_advance_received) || 0,
         total_expenses: totalExpenses,
         breakdown: breakdown,
         completed_at: new Date().toISOString(),
       });
 
-    if (logError) throw logError;
+    if (logError) {
+      console.error("Failed to create completion log:", logError);
+      throw logError;
+    }
 
     // 8. Fetch updated dashboard summary to get new profit wallet balance
     const { data: summary } = await supabase
@@ -150,6 +215,7 @@ export async function POST(
       finalProfit: finalProfit,
       reserveReleased: reserveReleased,
       tripSpendReleased: tripSpendReleased,
+      businessAccountReleased: businessAccountReleased,
       profitWalletBalance: totalProfit,
       breakdown: breakdown,
       message: "Trip completed successfully. Profit has been released to your Profit Wallet.",

@@ -19,7 +19,8 @@ export default function BusinessExpensesPage() {
     }).format(amount);
   };
 
-  const canAddExpense = financialSummary && financialSummary.operatingAccount > 0;
+  const businessAccountBalance = financialSummary?.businessAccount ?? financialSummary?.businessBalance ?? 0;
+  const canAddExpense = financialSummary && businessAccountBalance > 0;
 
   return (
     <div className="min-h-screen p-8">
@@ -41,13 +42,13 @@ export default function BusinessExpensesPage() {
             </Button>
             {!canAddExpense && financialSummary && (
               <p className="text-xs text-red-600 font-medium">
-                No funds available in Operating Account
+                No funds available in Business Account
               </p>
             )}
           </div>
         </div>
 
-        {/* Operating Account Balance Card */}
+        {/* Business Account Balance Card */}
         {financialSummary && (
           <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <CardContent className="p-6">
@@ -60,10 +61,10 @@ export default function BusinessExpensesPage() {
                     Available for Business Expenses
                   </p>
                   <p className="text-3xl font-bold text-blue-900">
-                    {formatCurrency(financialSummary.operatingAccount)}
+                    {formatCurrency(businessAccountBalance)}
                   </p>
                   <p className="text-sm text-blue-600 mt-1">
-                    Operating Account Balance
+                    Business Account Balance
                   </p>
                 </div>
               </div>

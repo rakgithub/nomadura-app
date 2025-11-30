@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Map, Menu, X, DollarSign, Wallet, MapPin } from "lucide-react";
+import { LayoutDashboard, Map, Menu, X, DollarSign, Wallet, MapPin, ArrowRightLeft } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -28,6 +28,11 @@ const navItems = [
     title: "Business Expenses",
     href: "/business-expenses",
     icon: DollarSign,
+  },
+  {
+    title: "Transfers",
+    href: "/transfers",
+    icon: ArrowRightLeft,
   },
   {
     title: "Withdrawals",

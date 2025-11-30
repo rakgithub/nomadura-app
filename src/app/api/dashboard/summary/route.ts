@@ -213,7 +213,18 @@ export async function GET(request: Request) {
 
     const totalTransfers = transfers?.reduce((sum, t: any) => sum + t.amount, 0) || 0;
 
-    // 7. Calculate FIVE BUCKETS per newprd.md
+    // 7. Fetch global transfers
+    const { data: globalTransfers, error: globalTransfersError } = await supabase
+      .from("global_transfers")
+      .select("from_bucket, to_bucket, amount")
+      .eq("user_id", user.id);
+
+    if (globalTransfersError) {
+      console.error("Failed to fetch global transfers:", globalTransfersError);
+      // Don't throw - continue with 0 transfers
+    }
+
+    // 8. Calculate FIVE BUCKETS per newprd.md
 
     // Bucket 1: Bank Balance = Total Advances Received + Earned Revenue – Total Expenses – Withdrawals
     const bankBalance = totalAdvanceReceived + earnedRevenue - tripExpenses - totalBusinessExpenses - totalWithdrawals;
@@ -224,21 +235,35 @@ export async function GET(request: Request) {
     const operatingAccount = totalOperatingBase - tripExpenses;
 
     // Bucket 4: Business Account = Business Base - Business Expenses
-    const businessAccount = totalBusinessBase - totalBusinessExpenses;
+    let businessAccount = totalBusinessBase - totalBusinessExpenses;
 
     // Bucket 5: Profit (Withdrawable) - from completed trips via released_profit
     // Sum of released_profit from all completed trips
     const totalProfit = trips?.reduce((sum, t: any) => {
-      return sum + (Number(t.released_profit) || 0);
-    }, 0) || 0;
-
-    // Trip Balances: Sum of operating_account for active trips (upcoming/in_progress)
-    const tripBalances = trips?.reduce((sum, t: any) => {
-      if (t.status === 'upcoming' || t.status === 'in_progress') {
-        return sum + (Number(t.operating_account) || 0);
+      if (t.status === 'completed') {
+        const releasedProfit = Number(t.released_profit) || 0;
+        console.log(`Completed trip ${t.id}: released_profit = ${releasedProfit}`);
+        return sum + releasedProfit;
       }
       return sum;
     }, 0) || 0;
+
+    console.log(`Dashboard: Total profit from ${trips?.length || 0} trips = ${totalProfit}`);
+
+    // Trip Balances: Sum of operating_account for active trips (upcoming/in_progress)
+    let tripBalances = trips?.reduce((sum, t: any) => {
+      if (t.status === 'upcoming' || t.status === 'in_progress') {
+        const balance = Number(t.operating_account) || 0;
+        console.log(`Active trip ${t.id}: operating_account = ${balance}`);
+        return sum + balance;
+      }
+      if (t.status === 'completed') {
+        console.log(`Completed trip ${t.id}: operating_account = ${Number(t.operating_account) || 0} (should be 0)`);
+      }
+      return sum;
+    }, 0) || 0;
+
+    console.log(`Dashboard: Trip balances = ${tripBalances}`);
 
     // Active Trips Count
     const activeTripsCount = trips?.filter((t: any) =>
@@ -246,17 +271,68 @@ export async function GET(request: Request) {
     ).length || 0;
 
     // Upcoming Locked Reserve: Sum of trip_reserve_balance for active trips
-    const upcomingLockedReserve = trips?.reduce((sum, t: any) => {
+    let upcomingLockedReserve = trips?.reduce((sum, t: any) => {
       if (t.status === 'upcoming' || t.status === 'in_progress') {
-        return sum + (Number(t.trip_reserve_balance) || 0);
+        const reserve = Number(t.trip_reserve_balance) || 0;
+        console.log(`Active trip ${t.id}: trip_reserve_balance = ${reserve}`);
+        return sum + reserve;
+      }
+      if (t.status === 'completed') {
+        console.log(`Completed trip ${t.id}: trip_reserve_balance = ${Number(t.trip_reserve_balance) || 0} (should be 0)`);
       }
       return sum;
     }, 0) || 0;
 
-    const profit = totalProfit;
-    const withdrawableProfit = Math.max(0, profit - totalWithdrawals - totalTransfers);
+    console.log(`Dashboard: Upcoming locked reserve = ${upcomingLockedReserve}`);
 
-    // 8. Build summary per FIVE-BUCKET MODEL
+    const profit = totalProfit;
+    let withdrawableProfit = Math.max(0, profit - totalWithdrawals - totalTransfers);
+
+    // Apply global transfers to adjust bucket balances
+    if (globalTransfers && globalTransfers.length > 0) {
+      console.log(`Applying ${globalTransfers.length} global transfers to balances`);
+
+      globalTransfers.forEach((transfer: any) => {
+        const amount = Number(transfer.amount);
+        console.log(`Transfer: ${transfer.from_bucket} → ${transfer.to_bucket}: ₹${amount}`);
+
+        // Deduct from source bucket
+        switch (transfer.from_bucket) {
+          case 'profit_withdrawable':
+            withdrawableProfit -= amount;
+            console.log(`  Withdrawable Profit: -${amount}`);
+            break;
+          case 'business_account':
+            businessAccount -= amount;
+            console.log(`  Business Account: -${amount}`);
+            break;
+          case 'trip_balances':
+            tripBalances -= amount;
+            console.log(`  Trip Balances: -${amount}`);
+            break;
+          case 'trip_reserves':
+            upcomingLockedReserve -= amount;
+            console.log(`  Trip Reserves: -${amount}`);
+            break;
+        }
+
+        // Add to destination bucket
+        switch (transfer.to_bucket) {
+          case 'trip_balances':
+            tripBalances += amount;
+            console.log(`  Trip Balances: +${amount}`);
+            break;
+          case 'business_account':
+            businessAccount += amount;
+            console.log(`  Business Account: +${amount}`);
+            break;
+        }
+      });
+
+      console.log(`After transfers - Profit: ${withdrawableProfit}, Business: ${businessAccount}, Trip Balances: ${tripBalances}, Reserves: ${upcomingLockedReserve}`);
+    }
+
+    // 9. Build summary per FIVE-BUCKET MODEL
     const totalExpenses = tripExpenses + totalBusinessExpenses;
     const profitPool = earnedRevenue * 0.30; // Keep for backward compatibility
     const operatingPool = earnedRevenue * 0.70; // Keep for backward compatibility
@@ -273,7 +349,7 @@ export async function GET(request: Request) {
     const summary = {
       // Five Buckets
       bankBalance,
-      tripReserve: totalTripReserves,
+      tripReserve: upcomingLockedReserve, // Use actual current reserves from active trips
       operatingAccount,
       businessAccount,
       profit,
