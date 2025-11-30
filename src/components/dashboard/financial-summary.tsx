@@ -8,6 +8,7 @@ import { BusinessAccountCard } from "./business-account-card";
 import { TripBalancesCard } from "./trip-balances-card";
 import { Loading } from "@/components/ui/loading";
 import { ErrorDisplay } from "@/components/ui/error";
+import { FinancialSummaryPlaceholder } from "./financial-summary-placeholder";
 
 interface FinancialSummaryProps {
   period?: FinancialPeriod;
@@ -18,13 +19,8 @@ export function FinancialSummary({ period = "all" }: FinancialSummaryProps) {
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Loading />
-        <Loading />
-        <Loading />
-        <Loading />
-        <Loading />
-        <Loading />
+      <div className="space-y-6">
+        <FinancialSummaryPlaceholder />
       </div>
     );
   }
